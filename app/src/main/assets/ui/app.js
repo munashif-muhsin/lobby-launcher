@@ -266,7 +266,7 @@ function renderApps(scroll=true){ $$('.app').forEach((a,k)=>a.classList.toggle('
   if(!scroll) return; const w=$('#p2 .appsWrap'), el=$$('.app')[st.app]; if(!el||!w) return;
   keepVisible(w,el.offsetTop,el.offsetTop+el.offsetHeight,24,110) }
 /* ================= TABS / HINTS ================= */
-function homeHints(){ setHints(st.tab===0?[['A','Open'],['Y','Choose apps'],['B','Games']]:st.tab===1?[['A','Play'],['Y','Details'],['B','Back']]:st.tab===2?[['A','Open'],['Y','Move to…'],['B','Games']]:[['A','Change'],['B','Games']]) }
+function homeHints(){ setHints(st.tab===0?[['A','Open'],['Y','Choose apps'],['B','Games']]:st.tab===1?(GAMES.length?[['A','Play'],['Y','Details']]:[]):st.tab===2?[['A','Open'],['Y','Move to…'],['B','Games']]:[['A','Change'],['B','Games']]) }
 function renderTabs(){
   $$('.tab').forEach((t,k)=>t.classList.toggle('on',k===st.tab));
   const t=$$('.tab')[st.tab],ind=$('#tabInd'); ind.style.left=(t.offsetLeft+16)+'px'; ind.style.width=(t.offsetWidth-32)+'px';

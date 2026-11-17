@@ -608,3 +608,7 @@ html,body{touch-action:manipulation;user-select:none;-webkit-user-select:none;-w
 .dacts{flex-wrap:nowrap!important;gap:10px!important;max-width:none!important}
 .dacts .obtn{padding:0 18px!important;height:52px!important}
 .dacts .obtn.icon{width:52px;padding:0!important;justify-content:center;flex-shrink:0}
+/* hero art runs all the way to the bottom edge; it only dims (never disappears) behind the tiles */
+.vA .heroArt{top:-80px!important;bottom:0!important;height:auto!important;
+  -webkit-mask-image:linear-gradient(to right,transparent 0%,rgba(0,0,0,.35) 14%,#000 38%),linear-gradient(to bottom,#000 55%,rgba(0,0,0,.55) 82%,rgba(0,0,0,.35) 100%)!important;
+  mask-image:linear-gradient(to right,transparent 0%,rgba(0,0,0,.35) 14%,#000 38%),linear-gradient(to bottom,#000 55%,rgba(0,0,0,.55) 82%,rgba(0,0,0,.35) 100%)!important}
