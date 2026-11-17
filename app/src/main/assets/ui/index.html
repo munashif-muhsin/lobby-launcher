@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Lobby</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <div id="bg" class="mode-black"><div class="art a"></div><div class="art b"></div></div>
+
+  <div id="top">
+    <span class="shoulder" id="L1">LB</span>
+    <div id="tabs">
+      <button class="tab" data-t="0">Streaming</button>
+      <button class="tab" data-t="1">Games</button>
+      <button class="tab" data-t="2">Apps</button>
+      <button class="tab" data-t="3">Preferences</button>
+      <div id="tabInd"></div>
+    </div>
+    <span class="shoulder" id="R1">RB</span>
+    <div id="status">
+      <div id="np"><div class="eq"><i></i><i></i><i></i></div><div class="t"></div></div>
+      <span id="clock">--:--</span>
+      <span class="bat"><svg width="26" height="14" viewBox="0 0 26 14" fill="none"><rect x=".5" y=".5" width="22" height="13" rx="3.5" stroke="currentColor"/><rect class="lvl" x="2.5" y="2.5" width="15" height="9" rx="1.5" fill="#F5F5F7"/><rect x="24" y="4.5" width="2" height="5" rx="1" fill="currentColor"/></svg><span id="batPct">--</span></span>
+    </div>
+  </div>
+
+  <div id="content">
+    <!-- Streaming -->
+    <section class="pane" id="p0">
+      <div class="sHead"><div class="eyebrow">STREAMING</div><span id="sCount"></span></div>
+      <div class="strow"></div>
+      <div class="sFoot"><span class="btnglyph">Y</span>Choose which apps appear here</div>
+    </section>
+    <!-- Games -->
+    <section class="pane" id="p1">
+      <div class="variant vA" id="vA">
+        <div class="heroArt"><div class="layer a"></div><div class="layer b"></div></div>
+        <div class="info"><div class="eyebrow"></div><h1></h1><div class="meta"></div>
+          <div class="actions"><button class="pill primary" data-act="play"><span class="btnglyph">A</span>Play</button><button class="pill" data-act="details"><span class="btnglyph">Y</span>Details</button></div></div>
+        <div class="rowWrap"><div class="rowLabel">Library <span></span></div><div class="row"></div></div>
+      </div>
+      <div class="variant vB" id="vB">
+        <div class="floor"></div>
+        <div class="ring3d"></div>
+        <div class="bInfo"><div class="eyebrow"></div><h2></h2><div class="meta"></div><div class="dots"></div></div>
+      </div>
+      <div class="variant vC" id="vC">
+        <div class="list"><div class="listHead"><span>ALL GAMES</span><span class="cnt"></span></div><div class="vp"><div class="inner"></div></div></div>
+        <div class="preview"><div class="pv cover"></div><div class="eyebrow" style="margin-top:26px"></div><h2></h2><div class="meta"></div>
+          <div class="actions"><button class="pill primary" data-act="play"><span class="btnglyph">A</span>Play</button><button class="pill" data-act="details"><span class="btnglyph">Y</span>Details</button></div></div>
+      </div>
+      <div class="empty" id="gEmpty" style="display:none"><div class="eyebrow">NO GAMES YET</div><h2>Your library is empty</h2><p>Lobby lists apps that Android marks as games. If yours aren't showing, open the Apps tab, highlight a game and press Y to move it here.</p></div>
+    </section>
+    <!-- Apps -->
+    <section class="pane" id="p2"><div class="appsHead">ALL APPS · <span id="appCount"></span> · <span style="color:var(--text)">Y</span> to move an app to Games or Streaming</div><div class="appsWrap"><div class="apps"></div></div></section>
+    <!-- Preferences -->
+    <section class="pane" id="p3">
+      <div class="prefs"><div class="prefsHead">Preferences</div><div class="rowsWrap"><div class="rows"></div></div></div>
+      <div class="pside"><div class="k">LIVE PREVIEW</div><div class="mini"><div class="mbg"></div><div class="mtiles"><i></i><i></i><i></i><i></i></div><div class="mtitle"></div></div><p id="pdesc"></p></div>
+    </section>
+  </div>
+
+  <!-- Details overlay -->
+  <div id="details">
+    <div class="dbg"><div class="art"></div></div>
+    <div class="inner">
+      <div class="dcov cover"></div>
+      <div class="dcap"></div>
+      <div class="dright">
+        <div class="eyebrow"></div>
+        <h1></h1>
+        <div class="dacts"></div>
+        <div class="stats"></div>
+        <div class="sesslbl">LAST 7 DAYS</div>
+        <div class="sess"></div>
+      </div>
+    </div>
+    <div class="sheet" id="coverSheet"><h3>Change cover</h3><div class="sub">Lobby checks the Play Store first, then IGDB, then generates one from the icon. Your pick always wins.</div><div class="copts"></div></div>
+    <div class="sheet" id="editSheet"><h3>Edit info</h3><div class="sub">Saved on this device. A re-scan never overwrites your changes.</div><div class="erows"></div></div>
+  </div>
+
+  <!-- Choose streaming apps -->
+  <div id="picker"><div class="ph"><div class="eyebrow">STREAMING</div><h2>Choose your streaming apps</h2><p>Ticked apps appear on the Streaming tab. Lobby pre-selects Xbox, PS Remote Play, Chiaki, Moonlight, Steam Link, GeForce NOW and Parsec when they're installed.</p></div><div class="pw"><div class="pg"></div></div></div>
+
+  <!-- Show in… -->
+  <div class="sheet" id="moveSheet"><div class="mhead"><img id="mvIcon" alt=""><div><h3 id="mvTitle">Show in</h3><div class="sub">Choose which tab this app appears in.</div></div></div><div class="mopts"></div></div>
+
+  <div id="hints"><span class="brand">LOBBY</span></div>
+
+  <!-- Onboarding -->
+  <div id="ob">
+    <div class="obtop"><span class="lg">LOBBY</span><div class="steps" style="display:flex;gap:26px"></div></div>
+    <div class="obbody"></div>
+    <div class="obfoot"><div class="left"></div><div class="btns" style="display:flex;gap:12px"></div></div>
+  </div>
+
+  <div id="flash"></div>
+  <div id="toast"></div>
+  <div id="boot"><div class="logo">LOBBY</div><div class="line"><i></i></div></div>
+</div></div>
+<script src="mock.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

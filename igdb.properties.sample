@@ -1,0 +1,3 @@
+# IGDB / Twitch developer credentials. Copy to igdb.properties (gitignored) and fill in.
+igdb.clientId=YOUR_TWITCH_CLIENT_ID
+igdb.clientSecret=YOUR_TWITCH_CLIENT_SECRET
