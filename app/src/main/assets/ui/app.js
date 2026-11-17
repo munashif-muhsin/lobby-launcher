@@ -264,9 +264,7 @@ function buildApps(){
 function appCols(){ const g=$('.apps'); const c=getComputedStyle(g).gridTemplateColumns.split(' ').filter(Boolean).length; return c||6 }
 function renderApps(scroll=true){ $$('.app').forEach((a,k)=>a.classList.toggle('f',k===st.app)); APP_COLS=appCols();
   if(!scroll) return; const w=$('#p2 .appsWrap'), el=$$('.app')[st.app]; if(!el||!w) return;
-  const top=el.offsetTop, bot=top+el.offsetHeight, pad=24;
-  if(top-pad<w.scrollTop) w.scrollTo({top:Math.max(0,top-pad),behavior:st.reduced?'auto':'smooth'});
-  else if(bot+110>w.scrollTop+w.clientHeight) w.scrollTo({top:bot+110-w.clientHeight,behavior:st.reduced?'auto':'smooth'}) }
+  keepVisible(w,el.offsetTop,el.offsetTop+el.offsetHeight,24,110) }
 /* ================= TABS / HINTS ================= */
 function homeHints(){ setHints(st.tab===0?[['A','Open'],['Y','Choose apps'],['B','Games']]:st.tab===1?[['A','Play'],['Y','Details'],['B','Back']]:st.tab===2?[['A','Open'],['Y','Move to…'],['B','Games']]:[['A','Change'],['B','Games']]) }
 function renderTabs(){
@@ -275,9 +273,19 @@ function renderTabs(){
   [0,1,2,3].forEach(k=>{const p=$('#p'+k);p.classList.toggle('on',k===st.tab);p.classList.toggle('left',k<st.tab)});
   homeHints(); updScrim();
 }
-function setTab(t){ const prev=st.tab; st.tab=(t+4)%4; if(st.tab===3&&prev!==3){ st.pref=0; const w=$('.prefs .rowsWrap'); if(w) w.scrollTop=0 } if(st.tab===1&&prev!==1&&GAMES.length){ st.game=0; renderGames() } if(st.tab===0&&prev!==0){ st.stream=0; renderStreams() } renderTabs(); if(st.tab===3) renderPrefs() }
+function setTab(t){ const prev=st.tab; st.tab=(t+4)%4; if(st.tab===3&&prev!==3){ st.pref=0; const w=$('.prefs .rowsWrap'); if(w){ cancelAnimationFrame(w._gr); w._gr=0; w.scrollTop=0 } } if(st.tab===1&&prev!==1&&GAMES.length){ st.game=0; renderGames() } if(st.tab===0&&prev!==0){ st.stream=0; renderStreams() } renderTabs(); if(st.tab===3) renderPrefs() }
 function renderNP(){ const t=TRACKS[st.track]; $('#np .t').innerHTML=st.music?`<b>${t.name}</b> · ${t.mood}`:'Music off'; $('#np').classList.toggle('off',!st.music) }
 
+
+/* Smooth scroll that can be retargeted every frame (holding the stick never restarts or stutters). */
+function glide(el,target){ if(!el) return; target=Math.max(0,Math.min(target,el.scrollHeight-el.clientHeight));
+  if(st.reduced){ el.scrollTop=target; return }
+  el._gt=target; if(el._gr) return;
+  const step=()=>{ const d=el._gt-el.scrollTop; if(Math.abs(d)<.6){ el.scrollTop=el._gt; el._gr=0; return }
+    el.scrollTop+=d*.22; el._gr=requestAnimationFrame(step) };
+  el._gr=requestAnimationFrame(step) }
+function keepVisible(w,top,bot,padTop,padBot){ const cur=w._gr?w._gt:w.scrollTop;
+  if(top-padTop<cur) glide(w,top-padTop); else if(bot+padBot>cur+w.clientHeight) glide(w,bot+padBot-w.clientHeight) }
 /* ================= PREFERENCES ================= */
 const arrow=v=>`<span class="arr">‹</span>${v}<span class="arr">›</span>`;
 const PREFS=[
@@ -324,16 +332,21 @@ const SECTIONS=[['Appearance',['Home layout','Background','Motion']],
   PREFS.splice(0,PREFS.length,...ordered); }
 $('.prefs .rows').innerHTML=PREFS.map((p,i)=>`${p.first?`<div class="psec">${p.sec}</div>`:''}<div class="pr" data-i="${i}"><div><div class="lbl">${p.lbl}</div><div class="sub">${p.sub}</div></div><div class="val"></div></div>`).join('');
 $$('.pr').forEach(el=>el.onclick=()=>{if(st.mode!=='home')return;st.pref=+el.dataset.i;act.A()});
-function renderPrefs(){
-  $$('.pr').forEach((r,k)=>{r.classList.toggle('f',k===st.pref);r.querySelector('.val').innerHTML=PREFS[k].val()});
-  { const w=$('.prefs .rowsWrap'), el=$$('.pr')[st.pref]; if(w&&el&&st.tab===3){ const top=el.offsetTop-(PREFS[st.pref].first?52:0), bot=el.offsetTop+el.offsetHeight;
-      if(top-12<w.scrollTop) w.scrollTo({top:Math.max(0,top-12),behavior:st.reduced?'auto':'smooth'});
-      else if(bot+90>w.scrollTop+w.clientHeight) w.scrollTo({top:bot+90-w.clientHeight,behavior:st.reduced?'auto':'smooth'}) } }
+function focusPref(){
+  $$('.pr').forEach((r,k)=>r.classList.toggle('f',k===st.pref));
   $('#pdesc').textContent=PREFS[st.pref].desc;
-  const mode=BGS[st.bg][0],mb=$('.mini .mbg'); mb.className='mbg'; mb.style.background=getComputedStyle($('#bg')).backgroundImage!=='none'?getComputedStyle($('#bg')).backgroundImage:'#000';
-  const g=GAMES[st.game]; mb.innerHTML=mode==='art'&&g?`<div class="art">${coverInner(g)}</div>`:'';
-  $('.mini .mtitle').textContent=g?g.name:'Lobby'; save();
-}
+  const w=$('.prefs .rowsWrap'), el=$$('.pr')[st.pref];
+  if(w&&el&&st.tab===3) keepVisible(w,el.offsetTop-(PREFS[st.pref].first?52:0),el.offsetTop+el.offsetHeight,12,90) }
+let prefTimer=0;
+function renderPrefs(light){
+  focusPref();
+  clearTimeout(prefTimer);
+  const heavy=()=>{ $$('.pr').forEach((r,k)=>{ r.querySelector('.val').innerHTML=PREFS[k].val() });
+    const mode=BGS[st.bg][0],mb=$('.mini .mbg'); mb.className='mbg'; const bgi=getComputedStyle($('#bg')).backgroundImage; mb.style.background=bgi!=='none'?bgi:'#000';
+    const g=GAMES[st.game]; mb.innerHTML=mode==='art'&&g?`<div class="art">${coverInner(g)}</div>`:'';
+    $('.mini .mtitle').textContent=g?g.name:'Lobby'; save() };
+  if(light) prefTimer=setTimeout(heavy,180); else heavy() }
+
 
 /* ================= DETAILS ================= */
 const DT={focus:0,sheet:null,sf:0,edit:null};
@@ -563,7 +576,7 @@ const act={
     if(st.tab===1){ if(!GAMES.length) return; const d=st.variant===2?(dy||dx):(dx||0); if(!d)return; const n=Math.max(0,Math.min(GAMES.length-1,st.game+d)); if(n!==st.game){st.game=n;renderGames()} }
     else if(st.tab===0){ if(dx){ st.stream=Math.max(0,Math.min(STREAMS.length,st.stream+dx)); renderStreams() } }
     else if(st.tab===2){ const n=st.app+dx+dy*APP_COLS; if(n>=0&&n<APPS.length){st.app=n;renderApps()} }
-    else{ if(dy)st.pref=Math.max(0,Math.min(PREFS.length-1,st.pref+dy)); else if(dx)PREFS[st.pref].step(dx); if(st.mode==='home') renderPrefs() }
+    else{ if(dy){ st.pref=Math.max(0,Math.min(PREFS.length-1,st.pref+dy)); focusPref() } else if(dx){ PREFS[st.pref].step(dx); if(st.mode==='home') renderPrefs() } }
   },
   A(){
     if(st.tab===1){ const g=GAMES[st.game]; if(g) launch(g.pkg,g.name) }
@@ -585,7 +598,7 @@ function route(a,...x){ const h=HANDLERS[st.mode]||act, before=focusSig(), mode=
   else if(a==='B') SFX.play(changed||mode!=='home'?'back':'edge');
   else if(a==='Y') { if(changed) SFX.play('select') }
   else if(a==='A') { if(!(mode==='home'&&st.tab<=2)) SFX.play('select') } }
-window.lobbyInput=(name,dx,dy)=>{ if(!booted) return; if(name==='move') route('move',dx,dy); else if(name!=='START') route(name) };
+window.lobbyInput=(name,dx,dy)=>{ if(!booted){ boot(); return } if(M.ctx&&M.ctx.state==='suspended'&&document.visibilityState!=='hidden') M.ctx.resume().catch(()=>{}); if(name==='move') route('move',dx,dy); else if(name!=='START') route(name) };
 
 /* ================= NATIVE CALLBACKS ================= */
 window.lobbyPause=()=>M.pause();
@@ -638,7 +651,11 @@ homeOK=!!L.isDefaultHome();
 st.game=0;
 loadAll(); renderVariant(); renderNP(); renderPrefs(); clock(); battery();
 setInterval(clock,15000); setInterval(battery,60000);
-(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{ renderTabs(); if(!MOCK) setTimeout(boot,650) });
+(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{ renderTabs(); if(!MOCK) setTimeout(boot,650) }).catch(()=>{});
+// Never wait on fonts to start taking input: boot anyway after a short delay, or when the app says the page is ready.
+if(!MOCK){ setTimeout(()=>{ renderTabs(); boot() },1500); window.lobbyReady=()=>setTimeout(()=>{ renderTabs(); boot() },700) }
+// Any touch also counts as "started" (and unlocks audio if Android held it back).
+document.addEventListener('touchstart',()=>{ if(!booted) boot(); else if(M.ctx&&M.ctx.state==='suspended') M.ctx.resume().catch(()=>{}) },{passive:true});
 renderTabs();
 // Pick up artwork for any game we haven't looked up yet (after first-run setup)
 if(st.onboarded){ const fresh=GAMES.filter(g=>!meta[g.pkg]); if(fresh.length) fetchArtFor(fresh) }

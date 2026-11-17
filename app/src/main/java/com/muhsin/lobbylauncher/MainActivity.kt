@@ -85,7 +85,7 @@ class MainActivity : Activity() {
                 }
                 override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean =
                     req.url.host != Bridge.HOST
-                override fun onPageFinished(view: WebView, url: String) { pageReady = true; pushInsets() }
+                override fun onPageFinished(view: WebView, url: String) { pageReady = true; pushInsets(); view.requestFocus(); js("window.lobbyReady&&lobbyReady()") }
             }
         }
         setContentView(web)
@@ -110,8 +110,7 @@ class MainActivity : Activity() {
         }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(pkgReceiver, f, Context.RECEIVER_EXPORTED)
         else registerReceiver(pkgReceiver, f)
-        // Live battery level + charging state for the top bar
-        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+
 
         // Android 13+ (and predictive back on 16): Back = "B", never close the launcher.
         if (Build.VERSION.SDK_INT >= 33) {
@@ -133,7 +132,6 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(pkgReceiver) } catch (_: Exception) {}
         web.destroy()
         super.onDestroy()
@@ -153,12 +151,16 @@ class MainActivity : Activity() {
         resumed = true
         web.onResume()
         web.resumeTimers()
+        // Live battery updates only while Lobby is on screen (nothing runs with the screen off)
+        try { registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) } catch (_: Exception) {}
+        web.requestFocus()
         immersive()
         js("window.lobbyResume&&lobbyResume()")
     }
 
     override fun onPause() {
         resumed = false
+        try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
         js("window.lobbyPause&&lobbyPause()")
         // Let the JS fade the music out, then stop the page doing work in the background.
         ui.postDelayed({ if (!resumed) { web.onPause(); web.pauseTimers() } }, 400)
@@ -167,7 +169,7 @@ class MainActivity : Activity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) immersive()
+        if (hasFocus) { immersive(); web.requestFocus() }
     }
 
     @Deprecated("Deprecated in Java")
