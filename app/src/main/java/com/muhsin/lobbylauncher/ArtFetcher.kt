@@ -65,6 +65,25 @@ object ArtFetcher {
         }
     }
 
+    /** Raw Play category ("GAME_ACTION", "TOOLS", …); "" if the app isn't on Play; null on network error. */
+    fun playCategory(pkg: String): String? {
+        val c = (URL("https://play.google.com/store/apps/details?id=$pkg&hl=en&gl=US").openConnection() as HttpURLConnection).apply {
+            connectTimeout = 8000; readTimeout = 10000
+            setRequestProperty("User-Agent", UA); setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+        }
+        val code = c.responseCode
+        if (code == 404) return ""
+        if (code != 200) return null
+        val html = c.inputStream.bufferedReader().readText()
+        Regex("<script type=\"application/ld\\+json\"[^>]*>(.*?)</script>", RegexOption.DOT_MATCHES_ALL).findAll(html).forEach { m ->
+            try {
+                val cat = JSONObject(m.groupValues[1]).optString("applicationCategory")
+                if (cat.isNotEmpty()) return cat
+            } catch (_: Exception) {}
+        }
+        return ""
+    }
+
     // ---------------------------------------------------------------- Play parsing
     private fun playGenre(html: String): String? {
         Regex("<script type=\"application/ld\\+json\"[^>]*>(.*?)</script>", RegexOption.DOT_MATCHES_ALL).findAll(html).forEach { m ->

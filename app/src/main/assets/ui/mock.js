@@ -7,7 +7,7 @@
   const apps=[
     ['com.neonworks.drift','Neon Drift',1],['com.lantern.hollowpeaks','Hollow Peaks',1],['gg.orbital.starfall','Starfall Tactics',1],
     ['com.ironhull.rustrain','Rust & Rain',1],['io.softlight.lumen','Lumen Garden',1],['com.tidal.irontide','Iron Tide',1],
-    ['com.eightbit.knights','Pixel Knights',1],['com.loopgames.echorun','Echo Run',1],
+    ['com.eightbit.knights','Pixel Knights',1],['com.epic.longname','The Legend of the Extremely Long Game Title: Definitive Remastered Edition',1],['com.mid.name','Call of Destiny: Warzone Mobile',1],['com.loopgames.echorun','Echo Run',1],
     ['com.microsoft.xboxone.smartglass','Xbox',0],['com.playstation.remoteplay','PS Remote Play',0],['com.metallic.chiaki','Chiaki',0],
     ['com.retroarch','RetroArch',0],['com.android.chrome','Chrome',0],['com.spotify.music','Spotify',0],['com.google.android.youtube','YouTube',0],
     ['com.android.settings','Settings',0],['com.google.android.apps.photos','Photos',0],['com.whatsapp','WhatsApp',0],['com.android.camera','Camera',0],
@@ -29,6 +29,7 @@
     getMeta:()=>JSON.stringify(meta),
     fetchArt:(list)=>{ JSON.parse(list).forEach((x,i)=>setTimeout(()=>{ const n=x.pkg.length%4; const m={src:n===0?'fallback':n===1?'igdb':'play',variants:{play:n>1,igdb:n===1||n===2,igdb2:n===1},genre:['Racing','Adventure','Strategy','Shooter','Puzzle','Action','RPG','Platformer'][i%8]}; meta[x.pkg]=m; lobbyArt(x.pkg,m); if(i===JSON.parse(list).length-1) setTimeout(()=>lobbyArtDone(),100)},250*(i+1))) },
     pickImage:p=>setTimeout(()=>lobbyGallery(p,false),300),
+    getPlayCategories:()=>'{}', checkCategories:l=>{ JSON.parse(l).forEach((p,i)=>setTimeout(()=>lobbyCategory(p,p==='com.retroarch'?'GAME_ARCADE':'TOOLS'),400+i*30)) },
     getBattery:()=>JSON.stringify({level:82,charging:false}), igdbEnabled:()=>false, openSettings:()=>{}
   };
 })();

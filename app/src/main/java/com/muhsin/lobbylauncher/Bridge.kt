@@ -269,6 +269,34 @@ class Bridge(private val a: MainActivity) {
         }
     }
 
+    // ------------------------------------------------------------ Play Store category check
+    private val catPrefs = a.getSharedPreferences("playcat", Context.MODE_PRIVATE)
+
+    /** Cached results: { pkg: "GAME_ACTION" | "TOOLS" | "" (not on Play) } */
+    @JavascriptInterface
+    fun getPlayCategories(): String {
+        val o = JSONObject()
+        for ((k, v) in catPrefs.all) o.put(k, v as? String ?: "")
+        return o.toString()
+    }
+
+    /** list = JSON [pkg]; looks up each app's Play Store category once and calls window.lobbyCategory(pkg, category). */
+    @JavascriptInterface
+    fun checkCategories(list: String) {
+        val arr = JSONArray(list)
+        for (i in 0 until arr.length()) {
+            val pkg = arr.getString(i)
+            if (catPrefs.contains(pkg)) continue
+            io.execute {
+                val cat = try { ArtFetcher.playCategory(pkg) } catch (e: Exception) { null }
+                if (cat != null) {           // null = network error -> try again next launch
+                    catPrefs.edit().putString(pkg, cat).apply()
+                    a.call("lobbyCategory", pkg, cat)
+                }
+            }
+        }
+    }
+
     @JavascriptInterface
     fun pickImage(pkg: String) {
         pendingImagePkg = pkg

@@ -27,7 +27,8 @@ const TABS=['Streaming','Games','Apps','Preferences'];
 
 /* ================= STATE ================= */
 const st={tab:1,game:0,app:0,stream:0,pref:0,variant:0,music:true,track:0,vol:6,bg:0,reduced:false,onboarded:false,mode:'home'};
-let cats={}, edits={}, meta={}, usage={}, raw=[];
+let cats={}, edits={}, meta={}, usage={}, raw=[], playcat={}, launched={};
+try{launched=JSON.parse(localStorage.getItem('lobby-launched')||'{}')}catch(e){}
 let GAMES=[], STREAMS=[], APPS=[];
 let usageOK=false, homeOK=false;
 try{Object.assign(st,JSON.parse(localStorage.getItem('lobby')||'{}'));st.tab=1;st.mode='home'}catch(e){}
@@ -45,7 +46,9 @@ function fmtDur(ms){ if(!ms) return '0m'; const m=Math.round(ms/60000); if(m<60)
 function fmtLast(t){ if(!t) return 'Never'; const d0=new Date();d0.setHours(0,0,0,0); const diff=Math.floor((d0-t)/86400000)+1;
   if(t>=d0.getTime()) return 'Today'; if(diff<=1) return 'Yesterday'; if(diff<7) return diff+' days ago';
   return new Date(t).toLocaleDateString([], {day:'numeric',month:'short'}) }
-function defaultCat(a){ if(STREAM_PKGS.includes(a.pkg)||STREAM_RX.test(a.name)) return 'stream'; return a.game?'game':'app' }
+const isPlayGame=p=>/^GAME/.test(playcat[p]||'');
+function prettyCat(c){ return (c||'').replace(/^GAME_?/,'').split('_').filter(Boolean).map(w=>w[0]+w.slice(1).toLowerCase()).join(' ').replace('Role Playing','RPG') }
+function defaultCat(a){ if(STREAM_PKGS.includes(a.pkg)||STREAM_RX.test(a.name)) return 'stream'; return (a.game||isPlayGame(a.pkg))?'game':'app' }
 const catOf=a=>cats[a.pkg]||defaultCat(a);
 function coverKey(g){ const m=meta[g.pkg]||{}, v=m.variants||{}, e=edits[g.pkg]||{};
   if(e.cover&&(e.cover==='gen'||v[e.cover])) return e.cover;
@@ -65,17 +68,26 @@ function setHints(list){ $('#hints').innerHTML='<span class="brand">LOBBY</span>
 function loadAll(){
   try{ raw=JSON.parse(L.getApps()) }catch(e){ raw=[] }
   try{ meta=JSON.parse(L.getMeta()) }catch(e){ meta={} }
+  try{ playcat=L.getPlayCategories?JSON.parse(L.getPlayCategories()):{} }catch(e){ playcat={} }
   refreshUsage(false);
   buildLists();
+  // Apps that don't flag themselves as games: ask the Play Store which category they're in.
+  const unknown=raw.filter(a=>!a.game&&!a.system&&!cats[a.pkg]&&!(a.pkg in playcat)).map(a=>a.pkg);
+  if(unknown.length&&L.checkCategories) L.checkCategories(JSON.stringify(unknown));
 }
+let catTimer=null, newlyFound=[];
+window.lobbyCategory=(pkg,cat)=>{ playcat[pkg]=cat;
+  if(/^GAME/.test(cat)&&!cats[pkg]){ newlyFound.push(pkg);
+    clearTimeout(catTimer); catTimer=setTimeout(()=>{ const found=newlyFound.splice(0); buildLists();
+      const gs=GAMES.filter(g=>found.includes(g.pkg)); if(gs.length){ toast(gs.length===1?`${gs[0].name} moved to Games`:`${gs.length} more games found`); fetchArtFor(gs) } },700) } };
 function refreshUsage(render=true){
   usageOK=!!L.hasUsageAccess();
   try{ usage=usageOK?JSON.parse(L.getUsage()):{} }catch(e){ usage={} }
   if(render){ buildLists(); }
 }
 function decorate(a){ const e=edits[a.pkg]||{}, m=meta[a.pkg]||{}, u=usage[a.pkg]||{};
-  return {pkg:a.pkg,label:a.name,name:e.name||a.name,genre:e.genre||m.genre||(EMU_RX.test(a.name)?'Emulator':'Game'),ver:a.ver,installed:a.installed,
-    total:u.total||0,last:u.last||0,week:u.week||0,days:u.days||[0,0,0,0,0,0,0],src:m.src||'fallback',maybe:!a.game&&EMU_RX.test(a.name+' '+a.pkg)} }
+  return {pkg:a.pkg,label:a.name,name:e.name||a.name,genre:e.genre||m.genre||(isPlayGame(a.pkg)&&prettyCat(playcat[a.pkg]))||(EMU_RX.test(a.name)?'Emulator':'Game'),ver:a.ver,installed:a.installed,
+    total:u.total||0,last:Math.max(u.last||0,launched[a.pkg]||0),week:u.week||0,days:u.days||[0,0,0,0,0,0,0],src:m.src||'fallback',maybe:!a.game&&EMU_RX.test(a.name+' '+a.pkg)} }
 function buildLists(){
   const all=raw.map(decorate);
   const byName=(x,y)=>x.name.localeCompare(y.name);
@@ -121,17 +133,37 @@ const M={ctx:null,cur:null,step:0,next:0,
 
 /* ================= LAYOUT ================= */
 const stage=$('#stage');
-function fit(){const k=Math.min(innerWidth/1280,innerHeight/720);stage.style.transform=`scale(${k})`}
+// Design height is fixed at 720; the width follows the screen's aspect ratio so wide
+// phones (19.5:9, 20:9, 21:9) are filled edge to edge instead of letterboxed.
+let STAGE_W=1280, APP_COLS=6;
+function fit(){
+  const w=innerWidth,h=innerHeight;
+  STAGE_W=Math.max(1280,Math.round(720*w/h));
+  stage.style.width=STAGE_W+'px';
+  APP_COLS=Math.max(6,Math.floor((STAGE_W-128+18)/192));
+  const ap=document.querySelector('.apps'); if(ap) ap.style.maxWidth=(APP_COLS*174+(APP_COLS-1)*18)+'px';
+  const k=Math.min(w/STAGE_W,h/720);
+  stage.style.transform=`scale(${k})`;
+  if(typeof renderTabs==='function'&&$$('.tab').length) try{renderTabs()}catch(e){}
+}
 addEventListener('resize',fit);fit();
 
 /* ================= GAMES ================= */
+/* Shrink a title until it fits in at most 2 lines (CSS clamps with "…" as a last resort). */
+function fitTitle(el,sizes,twoLineMax){ if(!el) return; const lh=.98; twoLineMax=twoLineMax||sizes[1];
+  // One line at the biggest size that fits; two lines only once we're at or below twoLineMax.
+  for(const s of sizes){ el.style.fontSize=s+'px'; el.style.lineHeight=lh; el.style.webkitLineClamp='unset';
+    const lines=Math.round(el.scrollHeight/(s*lh));
+    if(lines<=1||(lines<=2&&s<=twoLineMax)) break }
+  el.style.webkitLineClamp='2' }
+
 const row=$('#vA .row'), ring=$('#vB .ring3d');
 let heroFlip=0,bgFlip=0,lastBg='';
 function buildLibrary(){
-  row.innerHTML=GAMES.map((g,i)=>`<div class="tile" data-i="${i}">${cover(g)}</div>`).join('');
-  row.querySelectorAll('.cover').forEach(c=>{c.style.width='100%';c.style.height='100%'});
-  ring.innerHTML=GAMES.map((g,i)=>`<div class="card" data-i="${i}">${cover(g)}</div>`).join('');
-  $('#vC .inner').innerHTML=GAMES.map((g,i)=>`<div class="li" data-i="${i}"><span class="n">${String(i+1).padStart(2,'0')}</span><span class="nm">${esc(g.name)}</span><span class="g">${esc(g.genre)}</span></div>`).join('');
+  // Library items show the game's real app icon; the big hero / preview keeps the cover art.
+  row.innerHTML=GAMES.map((g,i)=>`<div class="tile" data-i="${i}"><img class="tic" src="${iconURL(g.pkg)}" alt="" decoding="async"></div>`).join('');
+  ring.innerHTML=GAMES.map((g,i)=>`<div class="card" data-i="${i}"><img class="cic" src="${iconURL(g.pkg)}" alt="" decoding="async"></div>`).join('');
+  $('#vC .inner').innerHTML=GAMES.map((g,i)=>`<div class="li" data-i="${i}"><img class="lic" src="${iconURL(g.pkg)}" alt="" loading="lazy"><span class="nm">${esc(g.name)}</span><span class="g">${esc(g.genre)}</span></div>`).join('');
   $$('.tile,.card,.li').forEach(el=>el.onclick=()=>{if(st.mode!=='home')return;const i=+el.dataset.i; if(i===st.game)act.A(); else{st.game=i;renderGames()}});
   $('#vA .rowLabel span').textContent=GAMES.length+(GAMES.length===1?' game':' games');
   $('#vB .dots').innerHTML=GAMES.slice(0,30).map(()=>'<i></i>').join('');
@@ -146,25 +178,27 @@ function renderGames(){
   if(!GAMES.length){ renderBg(); return }
   const i=st.game,g=GAMES[i];
   const A=$('#vA');
-  A.querySelector('.eyebrow').textContent=g.genre; A.querySelector('h1').textContent=g.name; A.querySelector('.meta').innerHTML=metaHTML(g);
+  A.querySelector('.eyebrow').textContent=g.genre; A.querySelector('h1').textContent=g.name; A.querySelector('.meta').innerHTML=metaHTML(g); fitTitle(A.querySelector('h1'),[88,72,60,50],60);
   replay(A.querySelector('.eyebrow'),'enter');replay(A.querySelector('h1'),'enter2');replay(A.querySelector('.meta'),'enter3');
   const Ls=A.querySelectorAll('.layer'); heroFlip^=1; Ls[heroFlip].innerHTML=coverInner(g); Ls[heroFlip].classList.add('on'); Ls[heroFlip^1].classList.remove('on');
-  row.style.transform=`translateX(${-i*252}px)`;
-  row.querySelectorAll('.tile').forEach((t,k)=>{t.classList.toggle('f',k===i);t.classList.toggle('after',k>i);t.classList.toggle('gone',k<i)});
+  // Keep the previous game peeking in from the left so you can tell there's more that way.
+  const PEEK=i>0?28:0;
+  row.style.transform=`translateX(${-i*146+PEEK}px)`;
+  row.querySelectorAll('.tile').forEach((t,k)=>{t.classList.toggle('f',k===i);t.classList.toggle('after',k>i);t.classList.toggle('peek',k===i-1);t.classList.toggle('gone',k<i-1)});
   const B=$('#vB');
   ring.querySelectorAll('.card').forEach((c,k)=>{const o=k-i,a=Math.abs(o);
     c.classList.toggle('f',o===0);
-    c.style.transform=`translateX(${o*196+Math.sign(o)*60}px) translateZ(${-a*150}px) rotateY(${o===0?0:-Math.sign(o)*38}deg)`;
+    c.style.transform=`translateX(${o*178+Math.sign(o)*50}px) translateZ(${-a*140}px) rotateY(${o===0?0:-Math.sign(o)*34}deg)`;
     c.style.opacity=a>3?0:1; c.style.zIndex=100-a; c.style.visibility=a>4?'hidden':'visible'});
-  B.querySelector('.eyebrow').textContent=g.genre; B.querySelector('h2').textContent=g.name; B.querySelector('.meta').innerHTML=metaHTML(g);
+  B.querySelector('.eyebrow').textContent=g.genre; B.querySelector('h2').textContent=g.name; B.querySelector('.meta').innerHTML=metaHTML(g); fitTitle(B.querySelector('h2'),[46,40,34]);
   replay(B.querySelector('h2'),'enter');replay(B.querySelector('.meta'),'enter2');
   B.querySelectorAll('.dots i').forEach((d,k)=>d.classList.toggle('on',k===Math.min(i,29)));
   const C=$('#vC');
   C.querySelectorAll('.li').forEach((l,k)=>l.classList.toggle('f',k===i));
-  C.querySelector('.inner').style.transform=`translateY(${150-i*54}px)`;
+  C.querySelector('.inner').style.transform=`translateY(${150-i*62}px)`;
   const pv=C.querySelector('.pv'); pv.innerHTML=coverInner(g); replay(pv,'enter');
   C.querySelector('.preview .eyebrow').textContent=g.genre;
-  C.querySelector('.preview h2').textContent=g.name; C.querySelector('.preview .meta').innerHTML=metaHTML(g);
+  C.querySelector('.preview h2').textContent=g.name; fitTitle(C.querySelector('.preview h2'),[48,40,34]); C.querySelector('.preview .meta').innerHTML=metaHTML(g);
   replay(C.querySelector('.preview h2'),'enter2');
   renderBg(); save();
 }
@@ -194,9 +228,12 @@ function renderStreams(){
 function buildApps(){
   $('.apps').innerHTML=APPS.map((a,i)=>`<div class="app" data-i="${i}"><div class="ic"><img src="${iconURL(a.pkg)}" alt="" loading="lazy"></div><div class="lb">${esc(a.name)}</div></div>`).join('');
   $('#appCount').textContent=APPS.length;
-  $$('.app').forEach(el=>el.onclick=()=>{if(st.mode!=='home')return;const i=+el.dataset.i; if(i===st.app)act.A(); else{st.app=i;renderApps()}});
+  $$('.app').forEach(el=>{ let t=null, long=false;
+    el.addEventListener('touchstart',()=>{ long=false; t=setTimeout(()=>{ long=true; if(st.mode!=='home')return; st.app=+el.dataset.i; renderApps(); openMove(APPS[st.app]) },550) },{passive:true});
+    ['touchend','touchmove','touchcancel'].forEach(ev=>el.addEventListener(ev,()=>clearTimeout(t),{passive:true}));
+    el.onclick=()=>{ if(long){long=false;return} if(st.mode!=='home')return;const i=+el.dataset.i; if(i===st.app)act.A(); else{st.app=i;renderApps()} } });
 }
-function renderApps(){ $$('.app').forEach((a,k)=>a.classList.toggle('f',k===st.app)); const r=Math.floor(st.app/6); $('.apps').style.transform=`translateY(${-Math.max(0,r-2)*154}px)` }
+function renderApps(){ $$('.app').forEach((a,k)=>a.classList.toggle('f',k===st.app)); const r=Math.floor(st.app/APP_COLS); $('.apps').style.transform=`translateY(${-Math.max(0,r-2)*164}px)` }
 
 /* ================= TABS / HINTS ================= */
 function homeHints(){ setHints(st.tab===0?[['A','Open'],['Y','Choose apps'],['B','Games']]:st.tab===1?[['A','Play'],['Y','Details'],['B','Back']]:st.tab===2?[['A','Open'],['Y','Move to…'],['B','Games']]:[['A','Change'],['B','Games']]) }
@@ -206,7 +243,7 @@ function renderTabs(){
   [0,1,2,3].forEach(k=>{const p=$('#p'+k);p.classList.toggle('on',k===st.tab);p.classList.toggle('left',k<st.tab)});
   homeHints();
 }
-function setTab(t){ st.tab=(t+4)%4; renderTabs(); if(st.tab===3) renderPrefs() }
+function setTab(t){ const prev=st.tab; st.tab=(t+4)%4; if(st.tab===1&&prev!==1&&GAMES.length){ st.game=0; renderGames() } if(st.tab===0&&prev!==0){ st.stream=0; renderStreams() } renderTabs(); if(st.tab===3) renderPrefs() }
 function renderNP(){ const t=TRACKS[st.track]; $('#np .t').innerHTML=st.music?`<b>${t.name}</b> · ${t.mood}`:'Music off'; $('#np').classList.toggle('off',!st.music) }
 
 /* ================= PREFERENCES ================= */
@@ -239,7 +276,7 @@ $('.prefs .rows').innerHTML=PREFS.map((p,i)=>`<div class="pr" data-i="${i}"><div
 $$('.pr').forEach(el=>el.onclick=()=>{if(st.mode!=='home')return;st.pref=+el.dataset.i;act.A()});
 function renderPrefs(){
   $$('.pr').forEach((r,k)=>{r.classList.toggle('f',k===st.pref);r.querySelector('.val').innerHTML=PREFS[k].val()});
-  $('.prefs .rows').style.transform=`translateY(${-Math.max(0,st.pref-7)*59}px)`;
+  $('.prefs .rows').style.transform=`translateY(${-Math.max(0,st.pref-6)*69}px)`;
   $('#pdesc').textContent=PREFS[st.pref].desc;
   const mode=BGS[st.bg][0],mb=$('.mini .mbg'); mb.className='mbg'; mb.style.background=getComputedStyle($('#bg')).backgroundImage!=='none'?getComputedStyle($('#bg')).backgroundImage:'#000';
   const g=GAMES[st.game]; mb.innerHTML=mode==='art'&&g?`<div class="art">${coverInner(g)}</div>`:'';
@@ -258,7 +295,7 @@ function renderDetails(full){
     D.querySelector('.dbg .art').innerHTML=coverInner(g);
     D.querySelector('.dcov').innerHTML=coverInner(g)+`<div class="srcchip ${k==='gen'?'fb':''}"><i></i>Cover · ${SRCNAME[k]}</div>`;
     D.querySelector('.dcap').innerHTML=`Info from <b>${SRCNAME[(meta[g.pkg]||{}).src||'fallback']==='Generated'?'this device':SRCNAME[(meta[g.pkg]||{}).src]}</b> · Hours from <b>Android usage stats</b><br>${esc(g.pkg)}${g.ver?' · v'+esc(g.ver):''}`;
-    D.querySelector('.eyebrow').textContent=g.genre; D.querySelector('h1').textContent=g.name;
+    D.querySelector('.eyebrow').textContent=g.genre; D.querySelector('h1').textContent=g.name; fitTitle(D.querySelector('h1'),[64,52,44]);
     const stats=usageOK?[[fmtDur(g.total),'Played'],[fmtDur(g.week),'This week'],[fmtLast(g.last),'Last played'],[g.installed?new Date(g.installed).toLocaleDateString([], {month:'short',year:'numeric'}):'—','Installed']]
       :[['—','Played'],['dim','Turn on usage access in Preferences'],[g.installed?new Date(g.installed).toLocaleDateString([], {month:'short',year:'numeric'}):'—','Installed']];
     D.querySelector('.stats').innerHTML=stats.map(([v,k])=>v==='dim'?`<div class="stat"><span class="v dim">${k}</span></div>`:`<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
@@ -366,7 +403,7 @@ window.lobbyGallery=(pkg,ok)=>{ if(!ok){ return } meta[pkg]=meta[pkg]||{src:'fal
   edits[pkg]=Object.assign(edits[pkg]||{},{cover:'gal'}); save(); afterEdit(); if(DT.sheet==='cover') renderCoverSheet(); toast('Cover updated') };
 
 /* ================= LAUNCH ================= */
-function launch(pkg,name){ replay($('#flash'),'go'); toast(`Launching ${name}…`); setTimeout(()=>{ if(!L.launch(pkg)) toast(`Couldn't open ${name}`) },260) }
+function launch(pkg,name){ launched[pkg]=Date.now(); try{localStorage.setItem('lobby-launched',JSON.stringify(launched))}catch(e){} replay($('#flash'),'go'); toast(`Launching ${name}…`); setTimeout(()=>{ if(!L.launch(pkg)) toast(`Couldn't open ${name}`) },260) }
 
 /* ================= ONBOARDING ================= */
 const STEPS=['Welcome','Home app','Usage access','Your games','Artwork'];
@@ -418,7 +455,7 @@ function renderOB(){
   }else if(s===4){
     const done=Math.max(0,OB.fetchI);
     h=`<div class="obhead"><div class="eyebrow">${OB.single?'RE-SCAN':'STEP 5 · ARTWORK'}</div><h1>${OB.fetchI>=OB.list.length?'Artwork ready':'Finding artwork…'}</h1>
-      <div class="pipe">Checked in order <b>Play Store</b>→<b>IGDB</b>→<b>Generated</b><span style="margin-left:8px">${L.igdbEnabled()?'':'IGDB is skipped until API keys are added. '}Change any cover from a game's Details.</span></div></div>
+      <div class="pipe"><b>Play Store</b>→<b>IGDB</b>→<b>Generated</b><span style="margin-left:8px">${L.igdbEnabled()?'Change any cover later from Details.':'IGDB off: no API keys in this build.'}</span></div></div>
       <div class="pbar"><i style="width:${OB.list.length?Math.min(100,done/OB.list.length*100):100}%"></i></div>
       <div class="fl">${OB.list.slice(0,10).map((g,k)=>{const m=meta[g.pkg],d=!!(m&&OB.got.has(g.pkg)),src=m?(m.src==='fallback'?'fallback':m.src):'fallback';
         return `<div class="fr go ${d?'done':''}"><div class="th">${d?coverInner(g):''}</div><div class="nm">${esc(g.name)}</div><div class="tg ${d?src:''}">${d?`<i></i>${SRCNAME[src]}`:'<span class="spin"></span>Searching'}</div></div>`}).join('')}
@@ -473,7 +510,7 @@ const act={
   move(dx,dy){
     if(st.tab===1){ if(!GAMES.length) return; const d=st.variant===2?(dy||dx):(dx||0); if(!d)return; const n=Math.max(0,Math.min(GAMES.length-1,st.game+d)); if(n!==st.game){st.game=n;renderGames()} }
     else if(st.tab===0){ if(dx){ st.stream=Math.max(0,Math.min(STREAMS.length,st.stream+dx)); renderStreams() } }
-    else if(st.tab===2){ const n=st.app+dx+dy*6; if(n>=0&&n<APPS.length){st.app=n;renderApps()} }
+    else if(st.tab===2){ const n=st.app+dx+dy*APP_COLS; if(n>=0&&n<APPS.length){st.app=n;renderApps()} }
     else{ if(dy)st.pref=Math.max(0,Math.min(PREFS.length-1,st.pref+dy)); else if(dx)PREFS[st.pref].step(dx); if(st.mode==='home') renderPrefs() }
   },
   A(){
@@ -492,11 +529,11 @@ window.lobbyInput=(name,dx,dy)=>{ if(!booted) return; if(name==='move') route('m
 
 /* ================= NATIVE CALLBACKS ================= */
 window.lobbyPause=()=>M.pause();
-window.lobbyResume=()=>{ M.resume(); const wasU=usageOK, wasH=homeOK; homeOK=!!L.isDefaultHome(); refreshUsage(true);
+window.lobbyResume=()=>{ M.resume(); const wasU=usageOK, wasH=homeOK; homeOK=!!L.isDefaultHome(); refreshUsage(true); if(st.mode==='home'){ st.game=0; st.stream=0; renderGames(); renderStreams() }
   if(st.mode==='ob'){ if(OB.step===2&&usageOK&&!wasU){ OB.f=-1; renderOB(); toast('Usage access is on') } else if(OB.step===1&&homeOK&&!wasH){ OB.f=-1; renderOB() } else renderOB() }
   if(st.tab===3&&st.mode==='home') renderPrefs(); battery() };
 window.lobbyHomeResult=ok=>{ homeOK=!!ok||!!L.isDefaultHome(); if(st.mode==='ob'&&OB.step===1){ OB.f=-1; renderOB(); if(homeOK) toast('Lobby is your home app') } };
-window.lobbyHome=()=>{ if(st.mode==='ob') return; if(st.mode==='details') closeDetails(); if(st.mode==='picker') PKa.B(); if(st.mode==='move') closeMove(); st.mode='home'; setTab(1) };
+window.lobbyHome=()=>{ if(st.mode==='ob') return; if(st.mode==='details') closeDetails(); if(st.mode==='picker') PKa.B(); if(st.mode==='move') closeMove(); st.mode='home'; setTab(1); if(GAMES.length){ st.game=0; renderGames() } };
 window.lobbyRefresh=()=>{ loadAll(); const fresh=GAMES.filter(g=>!meta[g.pkg]); if(fresh.length) fetchArtFor(fresh) };
 
 /* ================= BOOT ================= */
@@ -532,6 +569,7 @@ if(MOCK) $('#boot').addEventListener('click',boot);
 /* init */
 document.documentElement.classList.toggle('reduced',st.reduced);
 homeOK=!!L.isDefaultHome();
+st.game=0;
 loadAll(); renderVariant(); renderNP(); renderPrefs(); clock(); battery();
 setInterval(clock,15000); setInterval(battery,60000);
 (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{ renderTabs(); if(!MOCK) setTimeout(boot,650) });
