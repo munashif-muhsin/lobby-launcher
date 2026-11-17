@@ -85,10 +85,20 @@ class MainActivity : Activity() {
                 }
                 override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean =
                     req.url.host != Bridge.HOST
-                override fun onPageFinished(view: WebView, url: String) { pageReady = true }
+                override fun onPageFinished(view: WebView, url: String) { pageReady = true; pushInsets() }
             }
         }
         setContentView(web)
+        // Tell the UI where the notch / punch-hole is so content can stay clear of it.
+        web.setOnApplyWindowInsetsListener { v, insets ->
+            if (Build.VERSION.SDK_INT >= 28) {
+                val c = insets.displayCutout
+                safeL = c?.safeInsetLeft ?: 0
+                safeR = c?.safeInsetRight ?: 0
+                pushInsets()
+            }
+            v.onApplyWindowInsets(insets)
+        }
         web.loadUrl("https://${Bridge.HOST}/ui/index.html")
         immersive()
 
@@ -165,6 +175,11 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         bridge.onActivityResult(requestCode, resultCode, data)
     }
+
+    private var safeL = 0
+    private var safeR = 0
+    /** Cutout insets in physical pixels; the UI converts them to its own units. */
+    private fun pushInsets() { if (pageReady) call("lobbyInsets", safeL, safeR) }
 
     private fun immersive() {
         if (Build.VERSION.SDK_INT >= 30) {
@@ -247,6 +262,15 @@ class MainActivity : Activity() {
                 ui.postDelayed(this, 110)
             }
         }
+    }
+
+    // The WebView has focus and would swallow joystick events before onGenericMotionEvent
+    // ever sees them, so catch stick / hat / trigger movement here first.
+    override fun dispatchGenericMotionEvent(e: MotionEvent): Boolean {
+        val joy = (e.source and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK ||
+            (e.source and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
+        if (joy && e.action == MotionEvent.ACTION_MOVE) return onGenericMotionEvent(e)
+        return super.dispatchGenericMotionEvent(e)
     }
 
     override fun onGenericMotionEvent(e: MotionEvent): Boolean {

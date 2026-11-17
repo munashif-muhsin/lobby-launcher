@@ -26,7 +26,7 @@ const EMU_RX=/(emu|retroarch|ppsspp|dolphin|yuzu|citra|aethersx2|nethersx2|ducks
 const TABS=['Streaming','Games','Apps','Preferences'];
 
 /* ================= STATE ================= */
-const st={tab:1,game:0,app:0,stream:0,pref:0,variant:0,music:true,track:0,vol:6,bg:0,reduced:false,onboarded:false,mode:'home'};
+const st={tab:1,game:0,app:0,stream:0,pref:0,variant:0,music:true,track:0,vol:6,bg:0,reduced:false,sfx:true,onboarded:false,mode:'home'};
 let cats={}, edits={}, meta={}, usage={}, raw=[], playcat={}, launched={};
 try{launched=JSON.parse(localStorage.getItem('lobby-launched')||'{}')}catch(e){}
 let GAMES=[], STREAMS=[], APPS=[];
@@ -35,7 +35,7 @@ try{Object.assign(st,JSON.parse(localStorage.getItem('lobby')||'{}'));st.tab=1;s
 try{cats=JSON.parse(localStorage.getItem('lobby-cats')||'{}')}catch(e){}
 try{edits=JSON.parse(localStorage.getItem('lobby-edits')||'{}')}catch(e){}
 const save=()=>{try{
-  localStorage.setItem('lobby',JSON.stringify({variant:st.variant,music:st.music,track:st.track,vol:st.vol,bg:st.bg,reduced:st.reduced,onboarded:st.onboarded,game:st.game}));
+  localStorage.setItem('lobby',JSON.stringify({variant:st.variant,music:st.music,track:st.track,vol:st.vol,bg:st.bg,reduced:st.reduced,sfx:st.sfx,onboarded:st.onboarded,game:st.game}));
   localStorage.setItem('lobby-cats',JSON.stringify(cats)); localStorage.setItem('lobby-edits',JSON.stringify(edits));
 }catch(e){}};
 
@@ -62,7 +62,7 @@ function replay(el,cls){if(!el)return;el.classList.remove(cls);void el.offsetWid
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),1800)}
 function press(id){const e=$('#'+id);e.classList.add('press');setTimeout(()=>e.classList.remove('press'),160)}
 const G=l=>`<span class="btnglyph">${l}</span>`;
-function setHints(list){ $('#hints').innerHTML='<span class="brand">LOBBY</span>'+list.map(([g,l])=>`<span class="h">${G(g)}<span>${l}</span></span>`).join('') }
+function setHints(list){ const h=$('#hints'); h.innerHTML=list.length?`<div class="hpill">${list.map(([g,l])=>`<span class="h">${G(g)}<span>${l}</span></span>`).join('')}</div>`:''; }
 
 /* ================= DATA ================= */
 function loadAll(){
@@ -131,17 +131,38 @@ const M={ctx:null,cur:null,step:0,next:0,
       this.next+=sd; this.step++; } }
 };
 
+/* ================= INTERFACE SOUNDS (synthesised, no files) ================= */
+const SFX={out:null,
+  bus(){ if(!M.ctx) return null; if(!this.out){ this.out=M.ctx.createGain(); this.out.gain.value=.9; this.out.connect(M.ctx.destination) } return this.out },
+  tone(f1,f2,t0,dur,v,type='sine'){ const c=M.ctx,o=c.createOscillator(),g=c.createGain(); o.type=type;
+    o.frequency.setValueAtTime(f1,t0); if(f2) o.frequency.exponentialRampToValueAtTime(f2,t0+dur);
+    g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(v,t0+.004); g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    o.connect(g); g.connect(this.out); o.start(t0); o.stop(t0+dur+.02) },
+  play(kind){ if(!st.sfx||!M.ctx||M.ctx.state!=='running'||!this.bus()) return; const t=M.ctx.currentTime+.005;
+    if(kind==='move'){ this.tone(1500,1250,t,.045,.045); this.tone(3000,0,t,.02,.012,'triangle') }
+    else if(kind==='tab'){ this.tone(620,0,t,.07,.05,'triangle'); this.tone(930,0,t+.055,.09,.05,'triangle') }
+    else if(kind==='select'){ this.tone(880,1320,t,.09,.065) }
+    else if(kind==='back'){ this.tone(990,620,t,.1,.055) }
+    else if(kind==='toggle'){ this.tone(1180,0,t,.05,.05); this.tone(1580,0,t+.045,.06,.045) }
+    else if(kind==='launch'){ [523,659,784,1047].forEach((f,i)=>this.tone(f,0,t+i*.045,.22,.06)) }
+    else if(kind==='edge'){ this.tone(220,180,t,.06,.035,'triangle') } }
+};
 /* ================= LAYOUT ================= */
 const stage=$('#stage');
 // Design height is fixed at 720; the width follows the screen's aspect ratio so wide
 // phones (19.5:9, 20:9, 21:9) are filled edge to edge instead of letterboxed.
 let STAGE_W=1280, APP_COLS=6;
+// Display-cutout (notch) insets in CSS px, pushed by the app. The notch side gets the
+// inset plus a little breathing room; that strip stays black.
+let SAFE_L=0, SAFE_R=0;
+window.lobbyInsets=(l,r)=>{ const d=window.devicePixelRatio||1;
+  SAFE_L=l>0?Math.round(l/d)+8:0; SAFE_R=r>0?Math.round(r/d)+8:0; fit() };
 function fit(){
-  const w=innerWidth,h=innerHeight;
+  const wrap=document.getElementById('wrap'); wrap.style.paddingLeft=SAFE_L+'px'; wrap.style.paddingRight=SAFE_R+'px';
+  const w=innerWidth-SAFE_L-SAFE_R,h=innerHeight;
   STAGE_W=Math.max(1280,Math.round(720*w/h));
   stage.style.width=STAGE_W+'px';
-  APP_COLS=Math.max(6,Math.floor((STAGE_W-128+18)/192));
-  const ap=document.querySelector('.apps'); if(ap) ap.style.maxWidth=(APP_COLS*174+(APP_COLS-1)*18)+'px';
+
   const k=Math.min(w/STAGE_W,h/720);
   stage.style.transform=`scale(${k})`;
   if(typeof renderTabs==='function'&&$$('.tab').length) try{renderTabs()}catch(e){}
@@ -218,7 +239,7 @@ function buildStreams(){
   cards.push(`<div class="sc add" data-i="${STREAMS.length}"><div class="plus">+</div>Add or remove<br>streaming apps</div>`);
   $('.strow').innerHTML=cards.join('');
   $('#sCount').textContent=STREAMS.length?`${STREAMS.length} app${STREAMS.length>1?'s':''}`:'No streaming apps yet';
-  $$('.sc').forEach(el=>el.onclick=()=>{if(st.mode!=='home')return;const i=+el.dataset.i; if(i===st.stream)act.A(); else{st.stream=i;renderStreams()}});
+  $$('.sc').forEach(el=>el.onclick=()=>{if(st.mode!=='home')return; st.stream=+el.dataset.i; renderStreams(); act.A()});
 }
 function renderStreams(){
   const i=Math.min(st.stream,STREAMS.length);
@@ -228,15 +249,21 @@ function renderStreams(){
 
 /* ================= APPS ================= */
 function buildApps(){
-  $('.apps').innerHTML=APPS.map((a,i)=>`<div class="app" data-i="${i}"><div class="ic"><img src="${iconURL(a.pkg)}" alt="" loading="lazy"></div><div class="lb">${esc(a.name)}</div></div>`).join('');
+  $('.apps').innerHTML=APPS.map((a,i)=>`<div class="app" data-i="${i}"><img class="ic" src="${iconURL(a.pkg)}" alt="" loading="lazy" decoding="async"><div class="lb">${esc(a.name)}</div></div>`).join('');
   $('#appCount').textContent=APPS.length;
-  $$('.app').forEach(el=>{ let t=null, long=false;
-    el.addEventListener('touchstart',()=>{ long=false; t=setTimeout(()=>{ long=true; if(st.mode!=='home')return; st.app=+el.dataset.i; renderApps(); openMove(APPS[st.app]) },550) },{passive:true});
-    ['touchend','touchmove','touchcancel'].forEach(ev=>el.addEventListener(ev,()=>clearTimeout(t),{passive:true}));
-    el.onclick=()=>{ if(long){long=false;return} if(st.mode!=='home')return;const i=+el.dataset.i; if(i===st.app)act.A(); else{st.app=i;renderApps()} } });
+  $$('.app').forEach(el=>{ let t=null, long=false, moved=false, y0=0;
+    el.addEventListener('touchstart',e=>{ long=false; moved=false; y0=e.touches[0].clientY;
+      t=setTimeout(()=>{ if(moved||st.mode!=='home') return; long=true; st.app=+el.dataset.i; renderApps(false); openMove(APPS[st.app]) },550) },{passive:true});
+    el.addEventListener('touchmove',e=>{ if(Math.abs(e.touches[0].clientY-y0)>10){ moved=true; clearTimeout(t) } },{passive:true});
+    ['touchend','touchcancel'].forEach(ev=>el.addEventListener(ev,()=>clearTimeout(t),{passive:true}));
+    el.onclick=()=>{ if(long){long=false;return} if(moved||st.mode!=='home') return; st.app=+el.dataset.i; renderApps(false); act.A() } });
 }
-function renderApps(){ $$('.app').forEach((a,k)=>a.classList.toggle('f',k===st.app)); const r=Math.floor(st.app/APP_COLS); $('.apps').style.transform=`translateY(${-Math.max(0,r-2)*164}px)` }
-
+function appCols(){ const g=$('.apps'); const c=getComputedStyle(g).gridTemplateColumns.split(' ').filter(Boolean).length; return c||6 }
+function renderApps(scroll=true){ $$('.app').forEach((a,k)=>a.classList.toggle('f',k===st.app)); APP_COLS=appCols();
+  if(!scroll) return; const w=$('#p2 .appsWrap'), el=$$('.app')[st.app]; if(!el||!w) return;
+  const top=el.offsetTop, bot=top+el.offsetHeight, pad=24;
+  if(top-pad<w.scrollTop) w.scrollTo({top:Math.max(0,top-pad),behavior:st.reduced?'auto':'smooth'});
+  else if(bot+110>w.scrollTop+w.clientHeight) w.scrollTo({top:bot+110-w.clientHeight,behavior:st.reduced?'auto':'smooth'}) }
 /* ================= TABS / HINTS ================= */
 function homeHints(){ setHints(st.tab===0?[['A','Open'],['Y','Choose apps'],['B','Games']]:st.tab===1?[['A','Play'],['Y','Details'],['B','Back']]:st.tab===2?[['A','Open'],['Y','Move to…'],['B','Games']]:[['A','Change'],['B','Games']]) }
 function renderTabs(){
@@ -255,6 +282,8 @@ const PREFS=[
   val:()=>arrow(LAYOUTS[st.variant]),step:d=>{st.variant=(st.variant+(d||1)+3)%3;renderVariant();renderGames()}},
  {lbl:'Menu music',sub:'Plays while you browse Lobby',desc:'Music fades out the moment a game or app opens, and fades back in when you come back to Lobby.',
   val:()=>`<span class="tog ${st.music?'on':''}"></span>`,step:()=>{st.music=!st.music;M.applyLevel();renderNP()}},
+ {lbl:'Interface sounds',sub:'Clicks when you move and select',desc:'Short, quiet sounds when you move around, switch tabs, select or go back. They play even when the menu music is off.',
+  val:()=>`<span class="tog ${st.sfx?'on':''}"></span>`,step:()=>{st.sfx=!st.sfx; if(st.sfx) setTimeout(()=>SFX.play('toggle'),30)}},
  {lbl:'Music track',sub:'5 original menu themes',desc:'All five themes are generated live on the device, so they add no download size and use almost no battery. Change the track to hear it right away.',
   val:()=>arrow(`<span class="trk">${TRACKS[st.track].name}<small>${TRACKS[st.track].mood} · ${st.track+1}/5</small></span>`),step:d=>{st.track=(st.track+(d||1)+5)%5;if(!st.music){st.music=true}M.play(st.track);renderNP()}},
  {lbl:'Music volume',sub:'Separate from system volume',desc:'Lobby\'s music only. Games keep using your system volume.',
@@ -410,7 +439,7 @@ window.lobbyGallery=(pkg,ok)=>{ if(!ok){ return } meta[pkg]=meta[pkg]||{src:'fal
   edits[pkg]=Object.assign(edits[pkg]||{},{cover:'gal'}); save(); afterEdit(); if(DT.sheet==='cover') renderCoverSheet(); toast('Cover updated') };
 
 /* ================= LAUNCH ================= */
-function launch(pkg,name){ launched[pkg]=Date.now(); try{localStorage.setItem('lobby-launched',JSON.stringify(launched))}catch(e){} replay($('#flash'),'go'); toast(`Launching ${name}…`); setTimeout(()=>{ if(!L.launch(pkg)) toast(`Couldn't open ${name}`) },260) }
+function launch(pkg,name){ SFX.play('launch'); launched[pkg]=Date.now(); try{localStorage.setItem('lobby-launched',JSON.stringify(launched))}catch(e){} replay($('#flash'),'go'); toast(`Launching ${name}…`); setTimeout(()=>{ if(!L.launch(pkg)) toast(`Couldn't open ${name}`) },260) }
 
 /* ================= ONBOARDING ================= */
 const STEPS=['Welcome','Home app','Usage access','Your games','Artwork'];
@@ -531,7 +560,15 @@ const act={
   X(){}
 };
 const HANDLERS={home:act,details:DTa,ob:OBa,picker:PKa,move:MVa};
-function route(a,...x){ const h=HANDLERS[st.mode]||act; h[a]&&h[a](...x) }
+function focusSig(){ return [st.mode,st.tab,st.game,st.app,st.stream,st.pref,DT.focus,DT.sheet,DT.sf,OB.step,OB.f,PK.f,MV.f].join('|') }
+function route(a,...x){ const h=HANDLERS[st.mode]||act, before=focusSig(), mode=st.mode;
+  h[a]&&h[a](...x);
+  const changed=focusSig()!==before;
+  if(a==='move') SFX.play(changed?'move':'edge');
+  else if(a==='L1'||a==='R1') SFX.play('tab');
+  else if(a==='B') SFX.play(changed||mode!=='home'?'back':'edge');
+  else if(a==='Y') { if(changed) SFX.play('select') }
+  else if(a==='A') { if(!(mode==='home'&&st.tab<=2)) SFX.play('select') } }
 window.lobbyInput=(name,dx,dy)=>{ if(!booted) return; if(name==='move') route('move',dx,dy); else if(name!=='START') route(name) };
 
 /* ================= NATIVE CALLBACKS ================= */
@@ -557,12 +594,12 @@ window.lobbyBattery=(level,charging)=>showBattery(level,charging);
 function clock(){$('#clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
 
 // Pointer / touch
-$$('.tab').forEach(t=>t.onclick=()=>{if(st.mode==='home')setTab(+t.dataset.t)});
+$$('.tab').forEach(t=>t.onclick=()=>{if(st.mode==='home'){ if(+t.dataset.t!==st.tab) SFX.play('tab'); setTab(+t.dataset.t)}});
 $('#L1').onclick=()=>route('L1'); $('#R1').onclick=()=>route('R1');
 $$('[data-act="play"]').forEach(b=>b.onclick=()=>{if(st.mode==='home')act.A()});
 $$('[data-act="details"]').forEach(b=>b.onclick=()=>{if(st.mode==='home')openDetails()});
 $('#hints').addEventListener('click',e=>{const h=e.target.closest('.h');if(!h)return;const g=h.querySelector('.btnglyph');if(g)route(g.textContent)});
-let wheelLock=0; stage.addEventListener('wheel',e=>{if(!booted||st.mode!=='home'||Date.now()-wheelLock<140)return;wheelLock=Date.now();const d=Math.sign(e.deltaY||e.deltaX);(st.tab===1&&st.variant!==2)||st.tab===0?act.move(d,0):act.move(0,d)},{passive:true});
+let wheelLock=0; stage.addEventListener('wheel',e=>{if(!booted||st.mode!=='home'||st.tab===2||Date.now()-wheelLock<140)return;wheelLock=Date.now();const d=Math.sign(e.deltaY||e.deltaX);(st.tab===1&&st.variant!==2)||st.tab===0?act.move(d,0):act.move(0,d)},{passive:true});
 // Swipe left/right on the games/streaming rows (touch)
 let tx=null; stage.addEventListener('touchstart',e=>{tx=e.touches[0].clientX},{passive:true});
 stage.addEventListener('touchend',e=>{ if(tx===null||st.mode!=='home') return; const dx=e.changedTouches[0].clientX-tx; tx=null; if(Math.abs(dx)>60&&(st.tab<=1)) act.move(dx<0?1:-1,0) },{passive:true});

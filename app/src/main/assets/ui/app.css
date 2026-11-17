@@ -526,3 +526,41 @@ html,body{touch-action:manipulation;user-select:none;-webkit-user-select:none;-w
 #top::before{opacity:0;transition:opacity .4s var(--ease)}
 #stage.scrim #top::before{opacity:1}
 .mini .mtitle{right:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ===== no bottom bar: content runs to the edge, hints float in a pill ===== */
+#content{bottom:0!important}
+#hints{height:auto!important;left:auto!important;right:28px!important;bottom:18px!important;padding:0!important;gap:0!important;background:none!important}
+.hpill{display:flex;align-items:center;gap:24px;padding:9px 18px 9px 10px;border-radius:999px;
+  background:rgba(14,14,16,.62);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.hpill .h{display:flex;align-items:center;gap:9px;color:#D6D6DC}
+#hints .brand{display:none}
+/* keep bottom content clear of the floating hints */
+.vA .rowWrap{bottom:84px!important}
+.vB .bInfo{bottom:74px!important}
+.vB .ring3d{top:-24px}
+.vC .list,.vC .preview{bottom:80px!important}
+.vC .pv{height:280px!important}
+.sheet{padding-bottom:96px!important}
+
+/* ===== Apps tab: clean, touch-scrollable icon grid ===== */
+#p2 .appsHead{position:absolute;left:64px;right:64px;top:10px;display:flex;align-items:baseline;gap:12px;font:600 17px/1 var(--ui);letter-spacing:.16em;color:var(--muted)}
+#p2 .appsHead b{color:var(--text);letter-spacing:0;font-weight:600}
+#p2 .appsHead .tip{margin-left:auto;letter-spacing:0;font-weight:500;font-size:16px;text-transform:none}
+#p2 .appsWrap{position:absolute;left:0;right:0;top:40px;bottom:0;overflow-y:auto;overflow-x:hidden;padding:18px 52px 120px;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px,#000 calc(100% - 100px),transparent 100%);
+  mask-image:linear-gradient(to bottom,transparent 0,#000 18px,#000 calc(100% - 100px),transparent 100%)}
+#p2 .appsWrap::-webkit-scrollbar{display:none}
+#p2 .apps{position:static!important;max-width:none!important;transform:none!important;display:grid!important;
+  grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:8px 10px}
+#p2 .app{width:auto!important;height:156px!important;border:0!important;background:transparent!important;border-radius:22px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:10px 8px;transition:background .2s,transform .25s var(--ease),box-shadow .2s}
+#p2 .app .ic{width:76px!important;height:76px!important;border-radius:22px;box-shadow:0 10px 24px -8px rgba(0,0,0,.6);transition:transform .3s var(--spring)}
+#p2 .app .lb{font:500 17px/1.2 var(--ui)!important;color:#C9C9D1!important;text-align:center;max-width:100%;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+#p2 .app.f{background:rgba(255,255,255,.08)!important;box-shadow:0 0 0 3px var(--accent)!important;transform:none!important}
+#p2 .app.f .ic{transform:scale(1.1)}
+#p2 .app.f .lb{color:var(--text)!important}
+#p2 .app:active{background:rgba(255,255,255,.06)!important}
+.vA .layer .gen .gic{left:70%!important}
+.pane:not(.on),.pane:not(.on) *{pointer-events:none!important}
