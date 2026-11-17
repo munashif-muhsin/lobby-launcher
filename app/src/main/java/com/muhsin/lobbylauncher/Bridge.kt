@@ -338,8 +338,31 @@ class Bridge(private val a: MainActivity) {
         val level = i?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = i?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
         val status = i?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        val plugged = i?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val charging = plugged != 0 || status == BatteryManager.BATTERY_STATUS_CHARGING
         return JSONObject().put("level", if (level >= 0) level * 100 / scale else -1).put("charging", charging).toString()
+    }
+
+    /** Name of the phone's other home app (the one Lobby replaced), or "" if none. */
+    @JavascriptInterface
+    fun systemLauncherName(): String = otherLauncher()?.loadLabel(pm)?.toString() ?: ""
+
+    /** Opens the phone's own launcher once, without changing the default home app. */
+    @JavascriptInterface
+    fun openSystemLauncher(): Boolean {
+        val ri = otherLauncher() ?: return false
+        val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            .setClassName(ri.activityInfo.packageName, ri.activityInfo.name)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        a.runOnUiThread { try { a.startActivity(i) } catch (_: Exception) {} }
+        return true
+    }
+
+    private fun otherLauncher(): android.content.pm.ResolveInfo? {
+        val homes = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .filter { it.activityInfo.packageName != a.packageName && it.activityInfo.packageName != "com.android.settings" }
+        // Prefer the phone maker's launcher (a system app), then anything else.
+        return homes.firstOrNull { (it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 } ?: homes.firstOrNull()
     }
 
     @JavascriptInterface

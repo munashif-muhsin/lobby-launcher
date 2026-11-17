@@ -100,6 +100,8 @@ class MainActivity : Activity() {
         }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(pkgReceiver, f, Context.RECEIVER_EXPORTED)
         else registerReceiver(pkgReceiver, f)
+        // Live battery level + charging state for the top bar
+        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
 
         // Android 13+ (and predictive back on 16): Back = "B", never close the launcher.
         if (Build.VERSION.SDK_INT >= 33) {
@@ -109,7 +111,19 @@ class MainActivity : Activity() {
         }
     }
 
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            val level = i.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+            val scale = i.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100)
+            val status = i.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+            val plugged = i.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0)
+            val charging = plugged != 0 || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+            if (level >= 0 && pageReady) call("lobbyBattery", level * 100 / scale, charging)
+        }
+    }
+
     override fun onDestroy() {
+        try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(pkgReceiver) } catch (_: Exception) {}
         web.destroy()
         super.onDestroy()

@@ -504,3 +504,25 @@ html,body{touch-action:manipulation;user-select:none;-webkit-user-select:none;-w
 /* black band behind the tabs / clock / battery, fading to clear below the bar */
 #top::before{content:"";position:absolute;left:0;right:0;top:0;height:112px;z-index:-1;pointer-events:none;
   background:linear-gradient(180deg,#000 0%,#000 62%,rgba(0,0,0,.6) 82%,rgba(0,0,0,0) 100%)}
+/* top bar: translucent dark scrim that fades out over a taller area, so art shows through */
+#top::before{height:190px!important;
+  background:linear-gradient(180deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.55) 30%,rgba(0,0,0,.28) 60%,rgba(0,0,0,.08) 85%,rgba(0,0,0,0) 100%)!important}
+/* hero art: start at the very top of the screen, cover ~3/4 of the width, softer fades */
+.vA .heroArt{top:-80px!important;right:0;width:76%!important;height:600px!important;
+  -webkit-mask-image:linear-gradient(to right,transparent 0%,rgba(0,0,0,.35) 14%,#000 38%),linear-gradient(to bottom,#000 62%,transparent 100%)!important;
+  mask-image:linear-gradient(to right,transparent 0%,rgba(0,0,0,.35) 14%,#000 38%),linear-gradient(to bottom,#000 62%,transparent 100%)!important}
+/* keep the title readable where it overlaps the art */
+.vA .info{text-shadow:0 2px 24px rgba(0,0,0,.55)}
+.vA .info::before{content:"";position:absolute;left:-64px;top:-60px;width:calc(100% + 140px);height:calc(100% + 120px);z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse 70% 60% at 30% 50%,rgba(0,0,0,.55),transparent 75%)}
+
+/* battery: charging bolt + states */
+.bat .bolt{opacity:0;transition:opacity .3s}
+.bat.charging .bolt{opacity:1}
+.bat.charging .bolt{fill:#000;stroke:#3DFFB5}
+.bat.charging #batPct{color:var(--live)}
+.bat.low #batPct{color:var(--accent)}
+.bat svg{overflow:visible;width:30px;height:16px}
+#top::before{opacity:0;transition:opacity .4s var(--ease)}
+#stage.scrim #top::before{opacity:1}
+.mini .mtitle{right:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -30,6 +30,6 @@
     fetchArt:(list)=>{ JSON.parse(list).forEach((x,i)=>setTimeout(()=>{ const n=x.pkg.length%4; const m={src:n===0?'fallback':n===1?'igdb':'play',variants:{play:n>1,igdb:n===1||n===2,igdb2:n===1},genre:['Racing','Adventure','Strategy','Shooter','Puzzle','Action','RPG','Platformer'][i%8]}; meta[x.pkg]=m; lobbyArt(x.pkg,m); if(i===JSON.parse(list).length-1) setTimeout(()=>lobbyArtDone(),100)},250*(i+1))) },
     pickImage:p=>setTimeout(()=>lobbyGallery(p,false),300),
     getPlayCategories:()=>'{}', checkCategories:l=>{ JSON.parse(l).forEach((p,i)=>setTimeout(()=>lobbyCategory(p,p==='com.retroarch'?'GAME_ARCADE':'TOOLS'),400+i*30)) },
-    getBattery:()=>JSON.stringify({level:82,charging:false}), igdbEnabled:()=>false, openSettings:()=>{}
+    getBattery:()=>JSON.stringify({level:82,charging:true}), systemLauncherName:()=>'Pixel Launcher', openSystemLauncher:()=>true, igdbEnabled:()=>false, openSettings:()=>{}
   };
 })();

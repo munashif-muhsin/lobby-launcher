@@ -207,8 +207,10 @@ function renderBg(){
   const g=GAMES[st.game];
   if(mode==='art'&&g&&lastBg!==g.pkg+coverKey(g)){const Ls=bg.querySelectorAll('.art');bgFlip^=1;Ls[bgFlip].innerHTML=coverInner(g);Ls[bgFlip].classList.add('on');Ls[bgFlip^1].classList.remove('on');lastBg=g.pkg+coverKey(g)}
   if(mode!=='art') lastBg='';
+  updScrim();
 }
-function renderVariant(){ ['vA','vB','vC'].forEach((id,k)=>$('#'+id).classList.toggle('on',k===st.variant)) }
+function updScrim(){ const art=(st.tab===1&&st.variant===0&&GAMES.length)||BGS[st.bg][0]!=='black'||st.mode==='details'; stage.classList.toggle('scrim',!!art) }
+function renderVariant(){ ['vA','vB','vC'].forEach((id,k)=>$('#'+id).classList.toggle('on',k===st.variant)); updScrim() }
 
 /* ================= STREAMING ================= */
 function buildStreams(){
@@ -241,7 +243,7 @@ function renderTabs(){
   $$('.tab').forEach((t,k)=>t.classList.toggle('on',k===st.tab));
   const t=$$('.tab')[st.tab],ind=$('#tabInd'); ind.style.left=(t.offsetLeft+16)+'px'; ind.style.width=(t.offsetWidth-32)+'px';
   [0,1,2,3].forEach(k=>{const p=$('#p'+k);p.classList.toggle('on',k===st.tab);p.classList.toggle('left',k<st.tab)});
-  homeHints();
+  homeHints(); updScrim();
 }
 function setTab(t){ const prev=st.tab; st.tab=(t+4)%4; if(st.tab===1&&prev!==1&&GAMES.length){ st.game=0; renderGames() } if(st.tab===0&&prev!==0){ st.stream=0; renderStreams() } renderTabs(); if(st.tab===3) renderPrefs() }
 function renderNP(){ const t=TRACKS[st.track]; $('#np .t').innerHTML=st.music?`<b>${t.name}</b> · ${t.mood}`:'Music off'; $('#np').classList.toggle('off',!st.music) }
@@ -267,6 +269,11 @@ const PREFS=[
   val:()=>usageOK?`<span style="color:var(--live)">On</span>`:`<span style="color:var(--accent)">Turn on ›</span>`,step:()=>{ if(usageOK) toast('Usage access is on'); else startOnboarding(2,true) }},
  {lbl:'Home app',sub:'Home button opens Lobby',desc:'Make Lobby your home screen so the Home button always brings you back here. You can switch back in Android Settings at any time.',
   val:()=>homeOK?`<span style="color:var(--live)">Lobby</span>`:`<span style="color:var(--accent)">Set ›</span>`,step:()=>{ if(homeOK) toast('Lobby is your home app'); else startOnboarding(1,true) }},
+ {lbl:'Open system launcher',sub:'Use your phone\'s home screen once',desc:'Opens your phone\'s regular home screen one time. Lobby stays your home app, so pressing Home brings you straight back here.',
+  val:()=>{const n=L.systemLauncherName?L.systemLauncherName():'';return `<span style="color:var(--muted)">${esc(n||'')}</span><span class="arr">›</span>`},
+  step:()=>{ const n=L.systemLauncherName?L.systemLauncherName():''; if(L.openSystemLauncher&&L.openSystemLauncher()) toast(`Opening ${n||'system launcher'}…`); else toast('No other launcher found on this phone') }},
+ {lbl:'Android settings',sub:'Open the phone\'s Settings app',desc:'Wi-Fi, Bluetooth controllers, display, storage and everything else on the phone.',
+  val:()=>`<span class="arr">›</span>`,step:()=>{ toast('Opening Settings…'); L.openSettings() }},
  {lbl:'Re-scan artwork',sub:'Play Store → IGDB → Generated',desc:'Looks again for missing covers and genres. Covers, names and genres you changed yourself are never overwritten.',
   val:()=>`<span class="arr">A</span>`,step:()=>startOnboarding(4,true,true)},
  {lbl:'Replay setup',sub:'Run the welcome steps again',desc:'Walks through layout, home app, usage access, your games and artwork again.',
@@ -286,8 +293,8 @@ function renderPrefs(){
 /* ================= DETAILS ================= */
 const DT={focus:0,sheet:null,sf:0,edit:null};
 const DACTS=[['A','Play','play'],['','Change cover','cover'],['','Edit info','edit'],['','Move to…','move'],['','App info','info']];
-function openDetails(){ if(!GAMES.length) return; st.mode='details'; DT.focus=0; DT.sheet=null; renderDetails(true); $('#details').classList.add('on'); setHints([['A','Select'],['B','Back']]) }
-function closeDetails(){ st.mode='home'; $('#details').classList.remove('on'); closeSheet(true); homeHints() }
+function openDetails(){ if(!GAMES.length) return; st.mode='details'; DT.focus=0; DT.sheet=null; renderDetails(true); $('#details').classList.add('on'); setHints([['A','Select'],['B','Back']]); updScrim() }
+function closeDetails(){ st.mode='home'; $('#details').classList.remove('on'); closeSheet(true); homeHints(); updScrim() }
 function renderDetails(full){
   const g=GAMES[st.game],D=$('#details'); if(!g) return;
   if(full){
@@ -540,7 +547,13 @@ window.lobbyRefresh=()=>{ loadAll(); const fresh=GAMES.filter(g=>!meta[g.pkg]); 
 let booted=false;
 function boot(){ if(booted) return; booted=true; $('#boot').classList.add('gone'); M.init(); M.play(st.track);
   if(!st.onboarded) setTimeout(()=>startOnboarding(0),300) }
-function battery(){ try{ const b=JSON.parse(L.getBattery()); if(b.level>=0){ $('#batPct').textContent=b.level+'%'; $('.bat .lvl').setAttribute('width',Math.max(1,Math.round(15*b.level/100))); $('.bat .lvl').setAttribute('fill',b.charging?'#3DFFB5':b.level<=15?'#FF2D6F':'#F5F5F7') } }catch(e){} }
+function showBattery(level,charging){ if(level<0) return;
+  $('#batPct').textContent=level+'%';
+  const lv=$('.bat .lvl'); lv.setAttribute('width',Math.max(1,Math.round(15*level/100)));
+  lv.setAttribute('fill',charging?'#3DFFB5':level<=15?'#FF2D6F':'#F5F5F7');
+  $('.bat').classList.toggle('charging',!!charging); $('.bat').classList.toggle('low',!charging&&level<=15) }
+function battery(){ try{ const b=JSON.parse(L.getBattery()); showBattery(b.level,b.charging) }catch(e){} }
+window.lobbyBattery=(level,charging)=>showBattery(level,charging);
 function clock(){$('#clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
 
 // Pointer / touch
