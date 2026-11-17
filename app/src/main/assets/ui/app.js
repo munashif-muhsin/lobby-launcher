@@ -283,7 +283,7 @@ function renderTabs(){
   [0,1,2,3].forEach(k=>{const p=$('#p'+k);p.classList.toggle('on',k===st.tab);p.classList.toggle('left',k<st.tab)});
   homeHints(); updScrim();
 }
-function setTab(t){ const prev=st.tab; st.tab=(t+4)%4; if(st.tab===3&&prev!==3){ st.pref=0; const w=$('.prefs .rowsWrap'); if(w){ cancelAnimationFrame(w._gr); w._gr=0; w.scrollTop=0 } } if(st.tab===1&&prev!==1&&GAMES.length){ st.game=0; renderGames() } if(st.tab===0&&prev!==0){ st.stream=0; renderStreams() } renderTabs(); if(st.tab===3) renderPrefs() }
+function setTab(t){ const prev=st.tab; st.tab=(t+4)%4; if(st.tab===3&&prev!==3){ st.pref=0; const w=$('.prefs .rowsWrap'); if(w){ cancelAnimationFrame(w._gr); w._gr=0; w.scrollTop=0 } } renderTabs(); if(st.tab===3) renderPrefs() }
 function renderNP(){ const t=TRACKS[st.track]; $('#np .t').innerHTML=st.music?`<b>${t.name}</b> · ${t.mood}`:'Music off'; $('#np').classList.toggle('off',!st.music) }
 
 
