@@ -26,7 +26,7 @@ const EMU_RX=/(emu|retroarch|ppsspp|dolphin|yuzu|citra|aethersx2|nethersx2|ducks
 const TABS=['Streaming','Games','Apps','Preferences'];
 
 /* ================= STATE ================= */
-const st={tab:1,game:0,app:0,stream:0,pref:0,variant:0,music:true,track:0,vol:6,bg:0,reduced:false,sfx:true,onboarded:false,mode:'home'};
+const st={tab:1,game:0,app:0,stream:0,pref:0,variant:0,music:true,track:0,vol:6,bg:0,reduced:false,sfx:true,sfxVol:6,onboarded:false,mode:'home'};
 let cats={}, edits={}, meta={}, usage={}, raw=[], playcat={}, launched={};
 try{launched=JSON.parse(localStorage.getItem('lobby-launched')||'{}')}catch(e){}
 let GAMES=[], STREAMS=[], APPS=[];
@@ -35,7 +35,7 @@ try{Object.assign(st,JSON.parse(localStorage.getItem('lobby')||'{}'));st.tab=1;s
 try{cats=JSON.parse(localStorage.getItem('lobby-cats')||'{}')}catch(e){}
 try{edits=JSON.parse(localStorage.getItem('lobby-edits')||'{}')}catch(e){}
 const save=()=>{try{
-  localStorage.setItem('lobby',JSON.stringify({variant:st.variant,music:st.music,track:st.track,vol:st.vol,bg:st.bg,reduced:st.reduced,sfx:st.sfx,onboarded:st.onboarded,game:st.game}));
+  localStorage.setItem('lobby',JSON.stringify({variant:st.variant,music:st.music,track:st.track,vol:st.vol,bg:st.bg,reduced:st.reduced,sfx:st.sfx,sfxVol:st.sfxVol,onboarded:st.onboarded,game:st.game}));
   localStorage.setItem('lobby-cats',JSON.stringify(cats)); localStorage.setItem('lobby-edits',JSON.stringify(edits));
 }catch(e){}};
 
@@ -133,12 +133,12 @@ const M={ctx:null,cur:null,step:0,next:0,
 
 /* ================= INTERFACE SOUNDS (synthesised, no files) ================= */
 const SFX={out:null,
-  bus(){ if(!M.ctx) return null; if(!this.out){ this.out=M.ctx.createGain(); this.out.gain.value=.9; this.out.connect(M.ctx.destination) } return this.out },
+  bus(){ if(!M.ctx) return null; if(!this.out){ this.out=M.ctx.createGain(); this.out.connect(M.ctx.destination) } return this.out },
   tone(f1,f2,t0,dur,v,type='sine'){ const c=M.ctx,o=c.createOscillator(),g=c.createGain(); o.type=type;
     o.frequency.setValueAtTime(f1,t0); if(f2) o.frequency.exponentialRampToValueAtTime(f2,t0+dur);
     g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(v,t0+.004); g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
     o.connect(g); g.connect(this.out); o.start(t0); o.stop(t0+dur+.02) },
-  play(kind){ if(!st.sfx||!M.ctx||M.ctx.state!=='running'||!this.bus()) return; const t=M.ctx.currentTime+.005;
+  play(kind){ if(!st.sfx||!st.sfxVol||!M.ctx||M.ctx.state!=='running'||!this.bus()) return; this.out.gain.value=(st.sfxVol/10)*1.5; const t=M.ctx.currentTime+.005;
     if(kind==='move'){ this.tone(1500,1250,t,.045,.045); this.tone(3000,0,t,.02,.012,'triangle') }
     else if(kind==='tab'){ this.tone(620,0,t,.07,.05,'triangle'); this.tone(930,0,t+.055,.09,.05,'triangle') }
     else if(kind==='select'){ this.tone(880,1320,t,.09,.065) }
@@ -158,13 +158,16 @@ let SAFE_L=0, SAFE_R=0;
 window.lobbyInsets=(l,r)=>{ const d=window.devicePixelRatio||1;
   SAFE_L=l>0?Math.round(l/d)+8:0; SAFE_R=r>0?Math.round(r/d)+8:0; fit() };
 function fit(){
-  const wrap=document.getElementById('wrap'); wrap.style.paddingLeft=SAFE_L+'px'; wrap.style.paddingRight=SAFE_R+'px';
-  const w=innerWidth-SAFE_L-SAFE_R,h=innerHeight;
+  // The stage always spans the full screen (backgrounds + cover art go edge to edge, under the notch).
+  // Only the interface is inset, through the --sl / --sr variables (in stage units).
+  const wrap=document.getElementById('wrap'); wrap.style.paddingLeft='0px'; wrap.style.paddingRight='0px';
+  const w=innerWidth,h=innerHeight;
   STAGE_W=Math.max(1280,Math.round(720*w/h));
   stage.style.width=STAGE_W+'px';
-
   const k=Math.min(w/STAGE_W,h/720);
   stage.style.transform=`scale(${k})`;
+  stage.style.setProperty('--sl',Math.round(SAFE_L/k)+'px');
+  stage.style.setProperty('--sr',Math.round(SAFE_R/k)+'px');
   if(typeof renderTabs==='function'&&$$('.tab').length) try{renderTabs()}catch(e){}
 }
 addEventListener('resize',fit);fit();
@@ -284,6 +287,8 @@ const PREFS=[
   val:()=>`<span class="tog ${st.music?'on':''}"></span>`,step:()=>{st.music=!st.music;M.applyLevel();renderNP()}},
  {lbl:'Interface sounds',sub:'Clicks when you move and select',desc:'Short, quiet sounds when you move around, switch tabs, select or go back. They play even when the menu music is off.',
   val:()=>`<span class="tog ${st.sfx?'on':''}"></span>`,step:()=>{st.sfx=!st.sfx; if(st.sfx) setTimeout(()=>SFX.play('toggle'),30)}},
+ {lbl:'Sounds volume',sub:'Separate from the music',desc:'How loud the interface sounds are. Change it to hear a sample.',
+  val:()=>arrow(`<span class="vol">${Array.from({length:10},(_,k)=>`<i class="${k<st.sfxVol?'on':''}" style="height:${8+k*2}px"></i>`).join('')}</span>`),step:d=>{st.sfxVol=Math.max(0,Math.min(10,st.sfxVol+(d||1))); if(!st.sfx&&st.sfxVol) st.sfx=true; setTimeout(()=>SFX.play('move'),20)}},
  {lbl:'Music track',sub:'5 original menu themes',desc:'All five themes are generated live on the device, so they add no download size and use almost no battery. Change the track to hear it right away.',
   val:()=>arrow(`<span class="trk">${TRACKS[st.track].name}<small>${TRACKS[st.track].mood} · ${st.track+1}/5</small></span>`),step:d=>{st.track=(st.track+(d||1)+5)%5;if(!st.music){st.music=true}M.play(st.track);renderNP()}},
  {lbl:'Music volume',sub:'Separate from system volume',desc:'Lobby\'s music only. Games keep using your system volume.',
@@ -308,11 +313,22 @@ const PREFS=[
  {lbl:'Replay setup',sub:'Run the welcome steps again',desc:'Walks through layout, home app, usage access, your games and artwork again.',
   val:()=>`<span class="arr">A</span>`,step:()=>startOnboarding(0)},
 ];
-$('.prefs .rows').innerHTML=PREFS.map((p,i)=>`<div class="pr" data-i="${i}"><div><div class="lbl">${p.lbl}</div><div class="sub">${p.sub}</div></div><div class="val"></div></div>`).join('');
+// Group settings into sections (order here = order on screen)
+const SECTIONS=[['Appearance',['Home layout','Background','Motion']],
+  ['Sound',['Menu music','Music track','Music volume','Interface sounds','Sounds volume']],
+  ['Library',['Streaming apps','Re-scan artwork']],
+  ['Phone',['Home app','Usage access','Open system launcher','Android settings','Replay setup']]];
+{ const byLbl=Object.fromEntries(PREFS.map(p=>[p.lbl,p])), ordered=[];
+  SECTIONS.forEach(([sec,lbls],si)=>lbls.forEach((l,j)=>{ const p=byLbl[l]; if(p){ p.sec=sec; p.first=j===0; ordered.push(p) } }));
+  PREFS.filter(p=>!ordered.includes(p)).forEach(p=>{p.sec='More';ordered.push(p)});
+  PREFS.splice(0,PREFS.length,...ordered); }
+$('.prefs .rows').innerHTML=PREFS.map((p,i)=>`${p.first?`<div class="psec">${p.sec}</div>`:''}<div class="pr" data-i="${i}"><div><div class="lbl">${p.lbl}</div><div class="sub">${p.sub}</div></div><div class="val"></div></div>`).join('');
 $$('.pr').forEach(el=>el.onclick=()=>{if(st.mode!=='home')return;st.pref=+el.dataset.i;act.A()});
 function renderPrefs(){
   $$('.pr').forEach((r,k)=>{r.classList.toggle('f',k===st.pref);r.querySelector('.val').innerHTML=PREFS[k].val()});
-  $('.prefs .rows').style.transform=`translateY(${-Math.max(0,st.pref-6)*69}px)`;
+  { const w=$('.prefs .rowsWrap'), el=$$('.pr')[st.pref]; if(w&&el&&st.tab===3){ const top=el.offsetTop-(PREFS[st.pref].first?52:0), bot=el.offsetTop+el.offsetHeight;
+      if(top-12<w.scrollTop) w.scrollTo({top:Math.max(0,top-12),behavior:st.reduced?'auto':'smooth'});
+      else if(bot+90>w.scrollTop+w.clientHeight) w.scrollTo({top:bot+90-w.clientHeight,behavior:st.reduced?'auto':'smooth'}) } }
   $('#pdesc').textContent=PREFS[st.pref].desc;
   const mode=BGS[st.bg][0],mb=$('.mini .mbg'); mb.className='mbg'; mb.style.background=getComputedStyle($('#bg')).backgroundImage!=='none'?getComputedStyle($('#bg')).backgroundImage:'#000';
   const g=GAMES[st.game]; mb.innerHTML=mode==='art'&&g?`<div class="art">${coverInner(g)}</div>`:'';
@@ -599,7 +615,7 @@ $('#L1').onclick=()=>route('L1'); $('#R1').onclick=()=>route('R1');
 $$('[data-act="play"]').forEach(b=>b.onclick=()=>{if(st.mode==='home')act.A()});
 $$('[data-act="details"]').forEach(b=>b.onclick=()=>{if(st.mode==='home')openDetails()});
 $('#hints').addEventListener('click',e=>{const h=e.target.closest('.h');if(!h)return;const g=h.querySelector('.btnglyph');if(g)route(g.textContent)});
-let wheelLock=0; stage.addEventListener('wheel',e=>{if(!booted||st.mode!=='home'||st.tab===2||Date.now()-wheelLock<140)return;wheelLock=Date.now();const d=Math.sign(e.deltaY||e.deltaX);(st.tab===1&&st.variant!==2)||st.tab===0?act.move(d,0):act.move(0,d)},{passive:true});
+let wheelLock=0; stage.addEventListener('wheel',e=>{if(!booted||st.mode!=='home'||st.tab>=2||Date.now()-wheelLock<140)return;wheelLock=Date.now();const d=Math.sign(e.deltaY||e.deltaX);(st.tab===1&&st.variant!==2)||st.tab===0?act.move(d,0):act.move(0,d)},{passive:true});
 // Swipe left/right on the games/streaming rows (touch)
 let tx=null; stage.addEventListener('touchstart',e=>{tx=e.touches[0].clientX},{passive:true});
 stage.addEventListener('touchend',e=>{ if(tx===null||st.mode!=='home') return; const dx=e.changedTouches[0].clientX-tx; tx=null; if(Math.abs(dx)>60&&(st.tab<=1)) act.move(dx<0?1:-1,0) },{passive:true});

@@ -564,3 +564,30 @@ html,body{touch-action:manipulation;user-select:none;-webkit-user-select:none;-w
 #p2 .app:active{background:rgba(255,255,255,.06)!important}
 .vA .layer .gen .gic{left:70%!important}
 .pane:not(.on),.pane:not(.on) *{pointer-events:none!important}
+
+/* ===== Preferences: touch + controller scrolling ===== */
+.prefs{bottom:0}
+.prefs .rowsWrap{overflow-y:auto!important;overflow-x:hidden;bottom:0;height:auto!important;padding:2px 0 110px;
+  scrollbar-width:none;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 90px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 90px),transparent)}
+.prefs .rowsWrap::-webkit-scrollbar{display:none}
+.prefs .rows{transform:none!important}
+.prefs{position:absolute;top:16px}
+
+/* ===== Safe area: inset only the interface; art + backgrounds stay full-bleed ===== */
+#top{left:var(--sl,0px)!important;right:var(--sr,0px)!important}
+#top::before{left:calc(-1 * var(--sl,0px))!important;right:calc(-1 * var(--sr,0px))!important}
+#content{left:var(--sl,0px)!important;right:var(--sr,0px)!important}
+.vA .heroArt{right:calc(-1 * var(--sr,0px))!important;width:calc(76% + var(--sr,0px))!important}
+#hints{right:calc(28px + var(--sr,0px))!important}
+#details .inner{left:var(--sl,0px);right:var(--sr,0px)}
+.sheet{padding-left:calc(64px + var(--sl,0px))!important;padding-right:calc(64px + var(--sr,0px))!important}
+#picker .ph{left:calc(64px + var(--sl,0px))!important;right:calc(64px + var(--sr,0px))!important}
+#picker .pw{left:calc(58px + var(--sl,0px))!important;right:calc(58px + var(--sr,0px))!important}
+.obtop{left:calc(64px + var(--sl,0px))!important;right:calc(64px + var(--sr,0px))!important}
+.obbody{left:var(--sl,0px)!important;right:var(--sr,0px)!important}
+.obfoot{left:calc(64px + var(--sl,0px))!important;right:calc(64px + var(--sr,0px))!important}
+/* Preferences sections */
+.psec{font:600 15px/1 var(--ui);letter-spacing:.18em;text-transform:uppercase;color:var(--accent);padding:26px 22px 12px}
+.psec:first-child{padding-top:6px}
+.pr + .psec{margin-top:6px;border-top:1px solid var(--line)}
