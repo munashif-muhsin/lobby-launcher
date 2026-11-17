@@ -591,3 +591,20 @@ html,body{touch-action:manipulation;user-select:none;-webkit-user-select:none;-w
 .psec{font:600 15px/1 var(--ui);letter-spacing:.18em;text-transform:uppercase;color:var(--accent);padding:26px 22px 12px}
 .psec:first-child{padding-top:6px}
 .pr + .psec{margin-top:6px;border-top:1px solid var(--line)}
+/* ===== Details is a full screen of its own: covers the tab bar, has its own header ===== */
+#details{z-index:6}
+#hints{z-index:8!important}
+.sheet{z-index:7}
+.dhead{position:absolute;left:64px;top:22px;display:flex;align-items:center;gap:18px}
+.dback{display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 18px 0 8px;border-radius:999px;
+  background:rgba(255,255,255,.08);border:1px solid var(--line);font:600 17px/1 var(--ui);color:var(--text)}
+.dback:active{background:rgba(255,255,255,.16)}
+.crumb{font:500 17px/1 var(--ui);color:var(--muted)}
+.crumb i{font-style:normal;margin:0 6px;opacity:.6}
+.crumb b{color:var(--text);font-weight:600}
+.dcov{top:96px!important;width:420px!important;height:236px!important}
+.dcap{top:350px!important;width:420px!important}
+.dright{left:540px!important;top:84px!important}
+.dacts{flex-wrap:nowrap!important;gap:10px!important;max-width:none!important}
+.dacts .obtn{padding:0 18px!important;height:52px!important}
+.dacts .obtn.icon{width:52px;padding:0!important;justify-content:center;flex-shrink:0}

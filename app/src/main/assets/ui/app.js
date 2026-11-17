@@ -369,7 +369,10 @@ function renderDetails(full){
     D.querySelector('.sess').innerHTML=g.days.map((m,k)=>`<div class="b ${k===6?'today':''}"><i style="height:${usageOK?Math.max(4,m/mx*70):4}px"></i><span>${names[k]}</span></div>`).join('');
     replay(D.querySelector('h1'),'enter'); replay(D.querySelector('.dcov'),'enter');
   }
-  D.querySelector('.dacts').innerHTML=DACTS.map(([gl,l],k)=>`<button class="obtn ${k===0?'primary':''} ${k===DT.focus&&!DT.sheet?'f':''}" data-k="${k}">${gl?G(gl):''}${l}</button>`).join('');
+  const INFO_IC='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".6" fill="currentColor"/></svg>';
+  D.querySelector('.dacts').innerHTML=DACTS.map(([gl,l,k2],k)=>k2==='info'
+    ?`<button class="obtn icon ${k===DT.focus&&!DT.sheet?'f':''}" data-k="${k}" aria-label="App info" title="App info">${INFO_IC}</button>`
+    :`<button class="obtn ${k===0?'primary':''} ${k===DT.focus&&!DT.sheet?'f':''}" data-k="${k}">${gl?G(gl):''}${l}</button>`).join('');
   D.querySelectorAll('.dacts .obtn').forEach(b=>b.onclick=()=>{if(DT.sheet)return;DT.focus=+b.dataset.k;DTa.A()});
 }
 function closeSheet(silent){ DT.sheet=null; $$('#details .sheet').forEach(s=>s.classList.remove('on')); const inp=$('#ename'); if(inp)inp.blur(); if(!silent){renderDetails(); setHints([['A','Select'],['B','Back']])} }
@@ -627,6 +630,7 @@ $$('.tab').forEach(t=>t.onclick=()=>{if(st.mode==='home'){ if(+t.dataset.t!==st.
 $('#L1').onclick=()=>route('L1'); $('#R1').onclick=()=>route('R1');
 $$('[data-act="play"]').forEach(b=>b.onclick=()=>{if(st.mode==='home')act.A()});
 $$('[data-act="details"]').forEach(b=>b.onclick=()=>{if(st.mode==='home')openDetails()});
+$('#dback').onclick=()=>{ if(st.mode==='details'){ DTa.B(); SFX.play('back') } };
 $('#hints').addEventListener('click',e=>{const h=e.target.closest('.h');if(!h)return;const g=h.querySelector('.btnglyph');if(g)route(g.textContent)});
 let wheelLock=0; stage.addEventListener('wheel',e=>{if(!booted||st.mode!=='home'||st.tab>=2||Date.now()-wheelLock<140)return;wheelLock=Date.now();const d=Math.sign(e.deltaY||e.deltaX);(st.tab===1&&st.variant!==2)||st.tab===0?act.move(d,0):act.move(0,d)},{passive:true});
 // Swipe left/right on the games/streaming rows (touch)
