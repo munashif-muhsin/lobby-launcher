@@ -32,7 +32,7 @@
     <section class="pane" id="p0">
       <div class="sHead"><div class="eyebrow">STREAMING</div><span id="sCount"></span></div>
       <div class="strow"></div>
-      <div class="sFoot"><span class="btnglyph">Y</span>Choose which apps appear here</div>
+      <div class="sempty" id="sEmpty"><div class="eyebrow">NOTHING HERE YET</div><h2>Add your streaming apps</h2><p>Xbox, PS Remote Play, Chiaki, Moonlight, Steam Link, GeForce NOW, Parsec or any other app.</p><button class="obtn primary" id="sAdd"><span class="btnglyph">Y</span>Choose apps</button></div>
     </section>
     <!-- Games -->
     <section class="pane" id="p1">
@@ -55,7 +55,7 @@
       <div class="empty" id="gEmpty" style="display:none"><div class="eyebrow">NO GAMES YET</div><h2>Your library is empty</h2><p>Lobby lists apps that Android marks as games. If yours aren't showing, open the Apps tab, highlight a game and press Y to move it here.</p></div>
     </section>
     <!-- Apps -->
-    <section class="pane" id="p2"><div class="appsHead"><span>ALL APPS</span><b id="appCount"></b><span class="tip">Hold or press Y to move an app to Games or Streaming</span></div><div class="appsWrap"><div class="apps"></div></div></section>
+    <section class="pane" id="p2"><div class="appsHead"><span>ALL APPS</span><b id="appCount"></b><span class="tip">X to favourite · Y or hold for more</span></div><div class="appsWrap"><div class="apps"></div></div></section>
     <!-- Preferences -->
     <section class="pane" id="p3">
       <div class="prefs"><div class="prefsHead">Preferences</div><div class="rowsWrap"><div class="rows"></div></div></div>
@@ -84,10 +84,14 @@
   </div>
 
   <!-- Choose streaming apps -->
-  <div id="picker"><div class="ph"><div class="eyebrow">STREAMING</div><h2>Choose your streaming apps</h2><p>Ticked apps appear on the Streaming tab. Lobby pre-selects Xbox, PS Remote Play, Chiaki, Moonlight, Steam Link, GeForce NOW and Parsec when they're installed.</p></div><div class="pw"><div class="pg"></div></div></div>
+  <div id="picker">
+    <div class="pkhead"><button class="dback" id="pkdone"><span class="btnglyph">B</span>Done</button><span class="crumb">Streaming <i>›</i> <b>Choose apps</b></span><span class="pkcount" id="pkcount"></span></div>
+    <div class="pkintro"><h2>What do you stream with?</h2><p>Ticked apps show up on the Streaming tab, in the order you last used them.</p></div>
+    <div class="pw"><div class="pkgroups"></div></div>
+  </div>
 
   <!-- Show in… -->
-  <div class="sheet" id="moveSheet"><div class="mhead"><img id="mvIcon" alt=""><div><h3 id="mvTitle">Show in</h3><div class="sub">Choose which tab this app appears in.</div></div></div><div class="mopts"></div></div>
+  <div class="sheet" id="moveSheet"><div class="mhead"><img id="mvIcon" alt=""><div><h3 id="mvTitle">Show in</h3><div class="sub">Favourite it, or choose which tab it shows in.</div></div></div><div class="mopts"></div></div>
 
   <div id="hints"></div>
 

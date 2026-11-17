@@ -27,7 +27,8 @@ const TABS=['Streaming','Games','Apps','Preferences'];
 
 /* ================= STATE ================= */
 const st={tab:1,game:0,app:0,stream:0,pref:0,variant:0,music:true,track:0,vol:6,bg:0,reduced:false,sfx:true,sfxVol:6,onboarded:false,mode:'home'};
-let cats={}, edits={}, meta={}, usage={}, raw=[], playcat={}, launched={};
+let cats={}, edits={}, meta={}, usage={}, raw=[], playcat={}, launched={}, favs=[];
+try{favs=JSON.parse(localStorage.getItem('lobby-favs')||'[]')}catch(e){}
 try{launched=JSON.parse(localStorage.getItem('lobby-launched')||'{}')}catch(e){}
 let GAMES=[], STREAMS=[], APPS=[];
 let usageOK=false, homeOK=false;
@@ -36,7 +37,7 @@ try{cats=JSON.parse(localStorage.getItem('lobby-cats')||'{}')}catch(e){}
 try{edits=JSON.parse(localStorage.getItem('lobby-edits')||'{}')}catch(e){}
 const save=()=>{try{
   localStorage.setItem('lobby',JSON.stringify({variant:st.variant,music:st.music,track:st.track,vol:st.vol,bg:st.bg,reduced:st.reduced,sfx:st.sfx,sfxVol:st.sfxVol,onboarded:st.onboarded,game:st.game}));
-  localStorage.setItem('lobby-cats',JSON.stringify(cats)); localStorage.setItem('lobby-edits',JSON.stringify(edits));
+  localStorage.setItem('lobby-cats',JSON.stringify(cats)); localStorage.setItem('lobby-favs',JSON.stringify(favs)); localStorage.setItem('lobby-edits',JSON.stringify(edits));
 }catch(e){}};
 
 /* ================= HELPERS ================= */
@@ -96,7 +97,12 @@ function buildLists(){
   // Games: most recently played first, then A–Z
   GAMES.sort((x,y)=>(y.last-x.last)||byName(x,y));
   STREAMS=all.filter(a=>catOf(raw.find(r=>r.pkg===a.pkg))==='stream').sort((x,y)=>(y.last-x.last)||byName(x,y));
-  APPS=all.filter(a=>catOf(raw.find(r=>r.pkg===a.pkg))==='app').sort(byName);
+  const prevApp=APPS[st.app]&&APPS[st.app].pkg;
+  favs=favs.filter(p=>raw.some(r=>r.pkg===p));
+  APPS=all.filter(a=>catOf(raw.find(r=>r.pkg===a.pkg))==='app');
+  APPS.forEach(a=>a.fav=favs.includes(a.pkg));
+  APPS.sort((x,y)=>(y.fav-x.fav)||(x.fav?favs.indexOf(x.pkg)-favs.indexOf(y.pkg):byName(x,y)));
+  if(prevApp){ const i=APPS.findIndex(a=>a.pkg===prevApp); if(i>=0) st.app=i }
   st.game=Math.max(0,GAMES.findIndex(g=>g.pkg===prevGame)); if(st.game>=GAMES.length) st.game=0;
   st.stream=Math.max(0,STREAMS.findIndex(g=>g.pkg===prevStream)); if(st.stream>STREAMS.length) st.stream=0;
   if(st.app>=APPS.length) st.app=Math.max(0,APPS.length-1);
@@ -238,21 +244,25 @@ function renderVariant(){ ['vA','vB','vC'].forEach((id,k)=>$('#'+id).classList.t
 
 /* ================= STREAMING ================= */
 function buildStreams(){
-  const cards=STREAMS.map((s,i)=>{const ic=iconURL(s.pkg);return `<div class="sc" data-i="${i}"><img class="bgi" src="${ic}" alt=""><img class="ic" src="${ic}" alt=""><div class="nm">${esc(s.name)}</div><div class="sub">${s.last?'Last used '+fmtLast(s.last):'Ready to stream'}</div></div>`});
-  cards.push(`<div class="sc add" data-i="${STREAMS.length}"><div class="plus">+</div>Add or remove<br>streaming apps</div>`);
-  $('.strow').innerHTML=cards.join('');
-  $('#sCount').textContent=STREAMS.length?`${STREAMS.length} app${STREAMS.length>1?'s':''}`:'No streaming apps yet';
+  $('.strow').innerHTML=STREAMS.map((s,i)=>{const ic=iconURL(s.pkg);return `<div class="sc" data-i="${i}"><img class="bgi" src="${ic}" alt=""><img class="ic" src="${ic}" alt=""><div class="nm">${esc(s.name)}</div><div class="sub">${s.last?'Last used '+fmtLast(s.last):'Ready to stream'}</div></div>`}).join('');
+  $('#sCount').textContent=STREAMS.length?`${STREAMS.length} app${STREAMS.length>1?'s':''}`:'';
+  $('#sEmpty').style.display=STREAMS.length?'none':'block'; $('.sHead').style.display=STREAMS.length?'flex':'none'; $('.strow').style.display=STREAMS.length?'flex':'none';
+  if(st.stream>=STREAMS.length) st.stream=Math.max(0,STREAMS.length-1);
   $$('.sc').forEach(el=>el.onclick=()=>{if(st.mode!=='home')return; st.stream=+el.dataset.i; renderStreams(); act.A()});
 }
 function renderStreams(){
-  const i=Math.min(st.stream,STREAMS.length);
+  const i=Math.min(st.stream,Math.max(0,STREAMS.length-1));
   $$('.sc').forEach((c,k)=>c.classList.toggle('f',k===i));
   $('.strow').style.transform=`translateX(${-Math.max(0,i-3)*258}px)`;
 }
 
 /* ================= APPS ================= */
 function buildApps(){
-  $('.apps').innerHTML=APPS.map((a,i)=>`<div class="app" data-i="${i}"><img class="ic" src="${iconURL(a.pkg)}" alt="" loading="lazy" decoding="async"><div class="lb">${esc(a.name)}</div></div>`).join('');
+  const STAR='<svg width="14" height="14" viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4L2.8 9.5l6.4-.8z" fill="#FFC94D"/></svg>';
+  const tile=(a,i)=>`<div class="app ${a.fav?'isfav':''}" data-i="${i}"><div class="icw"><img class="ic" src="${iconURL(a.pkg)}" alt="" loading="lazy" decoding="async"></div><div class="lb">${esc(a.name)}</div></div>`;
+  const nf=APPS.filter(a=>a.fav).length;
+  $('.apps').innerHTML=(nf?`<div class="ash"><span class="st">${STAR}</span>Favourites<em>${nf}</em></div>`+APPS.slice(0,nf).map((a,i)=>tile(a,i)).join(''):'')+`<div class="ash">All apps<em>${APPS.length-nf}</em><span class="tip">X favourite · Y or hold for more</span></div>`
+    +APPS.slice(nf).map((a,i)=>tile(a,i+nf)).join('');
   $('#appCount').textContent=APPS.length;
   $$('.app').forEach(el=>{ let t=null, long=false, moved=false, y0=0;
     el.addEventListener('touchstart',e=>{ long=false; moved=false; y0=e.touches[0].clientY;
@@ -262,11 +272,11 @@ function buildApps(){
     el.onclick=()=>{ if(long){long=false;return} if(moved||st.mode!=='home') return; st.app=+el.dataset.i; renderApps(false); act.A() } });
 }
 function appCols(){ const g=$('.apps'); const c=getComputedStyle(g).gridTemplateColumns.split(' ').filter(Boolean).length; return c||6 }
-function renderApps(scroll=true){ $$('.app').forEach((a,k)=>a.classList.toggle('f',k===st.app)); APP_COLS=appCols();
+function renderApps(scroll=true){ $$('.app').forEach((a,k)=>a.classList.toggle('f',k===st.app)); APP_COLS=appCols(); if(st.tab===2&&st.mode==='home') homeHints();
   if(!scroll) return; const w=$('#p2 .appsWrap'), el=$$('.app')[st.app]; if(!el||!w) return;
   keepVisible(w,el.offsetTop,el.offsetTop+el.offsetHeight,24,110) }
 /* ================= TABS / HINTS ================= */
-function homeHints(){ setHints(st.tab===0?[['A','Open'],['Y','Choose apps'],['B','Games']]:st.tab===1?(GAMES.length?[['A','Play'],['Y','Details']]:[]):st.tab===2?[['A','Open'],['Y','Move to…'],['B','Games']]:[['A','Change'],['B','Games']]) }
+function homeHints(){ setHints(st.tab===0?(STREAMS.length?[['A','Open'],['Y','Choose apps'],['B','Games']]:[['Y','Choose apps'],['B','Games']]):st.tab===1?(GAMES.length?[['A','Play'],['Y','Details']]:[]):st.tab===2?[['A','Open'],['X',(APPS[st.app]&&APPS[st.app].fav)?'Unfavourite':'Favourite'],['Y','More'],['B','Games']]:[['A','Change'],['B','Games']]) }
 function renderTabs(){
   $$('.tab').forEach((t,k)=>t.classList.toggle('on',k===st.tab));
   const t=$$('.tab')[st.tab],ind=$('#tabInd'); ind.style.left=(t.offsetLeft+16)+'px'; ind.style.width=(t.offsetWidth-32)+'px';
@@ -429,36 +439,58 @@ function afterEdit(){ const pkg=GAMES[st.game]&&GAMES[st.game].pkg; buildLists()
 
 /* ================= MOVE TO… ================= */
 const MV={app:null,f:0,back:'home'};
-const MOPTS=[['game','Games','Shows in your library'],['stream','Streaming','Shows on the Streaming tab'],['app','Apps','Back to the app drawer']];
+const MOPTS=[['fav','Favourite','Pin to the top of Apps'],['game','Games','Shows in your library'],['stream','Streaming','Shows on the Streaming tab'],['app','Apps','Back to the app drawer']];
 function openMove(a){ MV.app=a; MV.back=st.mode; st.mode='move'; const cur=catOf(raw.find(r=>r.pkg===a.pkg)); MV.f=Math.max(0,MOPTS.findIndex(o=>o[0]===cur));
-  $('#mvIcon').src=iconURL(a.pkg); $('#mvTitle').textContent=`Show "${a.name}" in`; renderMove(); $('#moveSheet').classList.add('on'); setHints([['A','Move'],['B','Cancel']]) }
-function renderMove(){ const cur=catOf(raw.find(r=>r.pkg===MV.app.pkg));
-  $('#moveSheet .mopts').innerHTML=MOPTS.map(([k,l,d],i)=>`<div class="mo ${i===MV.f?'f':''} ${k===cur?'cur':''}" data-i="${i}"><b>${l}</b><span>${k===cur?'Current':d}</span></div>`).join('');
+  $('#mvIcon').src=iconURL(a.pkg); $('#mvTitle').textContent=a.name; renderMove(); $('#moveSheet').classList.add('on'); setHints([['A','Move'],['B','Cancel']]) }
+function renderMove(){ const cur=catOf(raw.find(r=>r.pkg===MV.app.pkg)), fav=favs.includes(MV.app.pkg);
+  $('#moveSheet .mopts').innerHTML=MOPTS.map(([k,l,d],i)=>k==='fav'
+    ?`<div class="mo fav ${i===MV.f?'f':''} ${fav?'cur':''}" data-i="${i}"><b>${fav?'★ Favourite':'☆ Favourite'}</b><span>${fav?'On · press A to remove':d}</span></div>`
+    :`<div class="mo ${i===MV.f?'f':''} ${k===cur?'cur':''}" data-i="${i}"><b>${l}</b><span>${k===cur?'Current':d}</span></div>`).join('');
   $$('#moveSheet .mo').forEach(m=>m.onclick=()=>{MV.f=+m.dataset.i;MVa.A()}) }
 function closeMove(){ $('#moveSheet').classList.remove('on'); st.mode=MV.back==='details'&&GAMES.some(g=>g.pkg===MV.app.pkg)?'details':'home'; if(st.mode==='details') setHints([['A','Select'],['B','Back']]); else { $('#details').classList.remove('on'); homeHints() } }
 const MVa={
-  move(dx){ if(dx){MV.f=Math.max(0,Math.min(2,MV.f+dx));renderMove()} },
-  A(){ const k=MOPTS[MV.f][0], a=MV.app; cats[a.pkg]=k; save(); buildLists(); closeMove(); if(st.mode==='details') renderDetails(true); toast(`${a.name} moved to ${MOPTS[MV.f][1]}`); if(k==='game') fetchArtFor([a]) },
+  move(dx){ if(dx){MV.f=Math.max(0,Math.min(MOPTS.length-1,MV.f+dx));renderMove()} },
+  A(){ const k=MOPTS[MV.f][0], a=MV.app; if(k==='fav'){ const i=favs.indexOf(a.pkg); if(i>=0) favs.splice(i,1); else favs.push(a.pkg); save(); buildLists(); renderMove(); toast(i>=0?`${a.name} removed from favourites`:`${a.name} added to favourites`); return } cats[a.pkg]=k; save(); buildLists(); closeMove(); if(st.mode==='details') renderDetails(true); toast(`${a.name} moved to ${MOPTS[MV.f][1]}`); if(k==='game') fetchArtFor([a]) },
   B(){ closeMove() }, Y(){}, L1(){}, R1(){}, X(){}
 };
 
 /* ================= PICKER (streaming apps) ================= */
 const PK={list:[],f:0,sel:null};
+const isStreamy=a=>STREAM_PKGS.includes(a.pkg)||STREAM_RX.test(a.name);
 function openPicker(){
-  PK.list=raw.map(decorate).sort((x,y)=>{const sx=catOf(raw.find(r=>r.pkg===x.pkg))==='stream',sy=catOf(raw.find(r=>r.pkg===y.pkg))==='stream';return (sy-sx)||x.name.localeCompare(y.name)});
-  PK.sel=new Set(PK.list.filter(a=>catOf(raw.find(r=>r.pkg===a.pkg))==='stream').map(a=>a.pkg)); PK.f=0;
-  $('#picker .pg').innerHTML=PK.list.map((a,i)=>`<div class="pk" data-i="${i}"><span class="ck"></span><img src="${iconURL(a.pkg)}" alt="" loading="lazy"><div class="lb">${esc(a.name)}</div></div>`).join('');
+  const all=raw.map(decorate).filter(a=>!a.system||isStreamy(a));
+  const sel=new Set(all.filter(a=>catOf(raw.find(r=>r.pkg===a.pkg))==='stream').map(a=>a.pkg));
+  const byName=(x,y)=>x.name.localeCompare(y.name);
+  // Fixed order while the screen is open, so ticking never makes items jump around
+  const suggested=all.filter(a=>sel.has(a.pkg)||isStreamy(a)).sort((x,y)=>(sel.has(y.pkg)-sel.has(x.pkg))||byName(x,y));
+  const others=all.filter(a=>!suggested.includes(a)).sort(byName);
+  PK.list=[...suggested,...others]; PK.sel=sel; PK.f=0;
+  const card=(a,i)=>`<div class="pk" data-i="${i}"><img src="${iconURL(a.pkg)}" alt="" loading="lazy"><div class="pkt"><div class="lb">${esc(a.name)}</div><div class="pks"></div></div><span class="ck"></span></div>`;
+  let html=''; if(suggested.length) html+=`<div class="pkg"><div class="pkh">Suggested <span>Streaming and remote-play apps found on this phone</span></div><div class="pkgrid">${suggested.map((a,i)=>card(a,i)).join('')}</div></div>`;
+  html+=`<div class="pkg"><div class="pkh">All other apps</div><div class="pkgrid">${others.map((a,i)=>card(a,i+suggested.length)).join('')}</div></div>`;
+  $('#picker .pkgroups').innerHTML=html; $('#picker .pw').scrollTop=0;
   $$('#picker .pk').forEach(el=>el.onclick=()=>{PK.f=+el.dataset.i;PKa.A()});
-  st.mode='picker'; renderPicker(); $('#picker').classList.add('on'); setHints([['A','Select'],['B','Done']]) }
-function renderPicker(){ $$('#picker .pk').forEach((el,i)=>{const on=PK.sel.has(PK.list[i].pkg);el.classList.toggle('on',on);el.classList.toggle('f',i===PK.f);
-  el.querySelector('.ck').innerHTML=on?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="4"><path d="M5 12l5 5 9-10"/></svg>':''});
-  $('#picker .pg').style.transform=`translateY(${-Math.max(0,Math.floor(PK.f/6)-1)*126}px)` }
+  st.mode='picker'; renderPicker(); $('#picker').classList.add('on'); setHints([['A','Add / remove'],['B','Done']]) }
+function renderPicker(){
+  $$('#picker .pk').forEach((el,i)=>{const on=PK.sel.has(PK.list[i].pkg);el.classList.toggle('on',on);el.classList.toggle('f',i===PK.f);
+    el.querySelector('.ck').innerHTML=on?'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>':'';
+    el.querySelector('.pks').textContent=on?'On Streaming tab':'' });
+  const n=PK.sel.size; $('#pkcount').textContent=n?`${n} selected`:'None selected';
+  const el=$$('#picker .pk')[PK.f], w=$('#picker .pw'); if(el&&w){ const g=el.closest('.pkg'), first=g.querySelector('.pk')===el||el.offsetTop-g.offsetTop<70;
+    keepVisible(w,first?g.offsetTop:el.offsetTop,el.offsetTop+el.offsetHeight,16,40) } }
+// Spatial navigation: go to the nearest card in the pressed direction (works across the two sections)
+function spatial(items,cur,dx,dy){ const r0=items[cur].getBoundingClientRect(), cx=r0.left+r0.width/2, cy=r0.top+r0.height/2; let best=-1,bd=1e9;
+  items.forEach((el,i)=>{ if(i===cur) return; const r=el.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2, ddx=x-cx, ddy=y-cy;
+    if(dx&&(Math.sign(ddx)!==dx||Math.abs(ddy)>r0.height/2)) return;
+    if(dy&&(Math.sign(ddy)!==dy||Math.abs(ddy)<4)) return;
+    const d=dy?Math.abs(ddy)*3+Math.abs(ddx):Math.abs(ddx); if(d<bd){bd=d;best=i} });
+  return best<0?cur:best }
 const PKa={
-  move(dx,dy){ PK.f=Math.max(0,Math.min(PK.list.length-1,PK.f+dx+dy*6)); renderPicker() },
-  A(){ const a=PK.list[PK.f]; if(!a) return; PK.sel.has(a.pkg)?PK.sel.delete(a.pkg):PK.sel.add(a.pkg); renderPicker() },
+  move(dx,dy){ const it=$$('#picker .pk'); if(!it.length) return; PK.f=spatial(it,PK.f,dx,dy); renderPicker() },
+  A(){ const a=PK.list[PK.f]; if(!a) return; PK.sel.has(a.pkg)?PK.sel.delete(a.pkg):PK.sel.add(a.pkg); SFX.play('toggle'); renderPicker() },
   B(){ PK.list.forEach(a=>{ const r=raw.find(x=>x.pkg===a.pkg), was=catOf(r)==='stream', now=PK.sel.has(a.pkg);
-      if(now&&!was) cats[a.pkg]='stream'; else if(!now&&was) cats[a.pkg]=r.game?'game':'app' });
-    save(); buildLists(); $('#picker').classList.remove('on'); st.mode='home'; homeHints(); if(st.tab===3) renderPrefs(); toast(`${STREAMS.length} streaming app${STREAMS.length===1?'':'s'}`) },
+      if(now&&!was) cats[a.pkg]='stream'; else if(!now&&was) cats[a.pkg]=(r.game||isPlayGame(r.pkg))?'game':'app' });
+    save(); buildLists(); $('#picker').classList.remove('on'); st.mode='home'; st.stream=0; renderStreams(); homeHints(); if(st.tab===3) renderPrefs(); toast(`${STREAMS.length} streaming app${STREAMS.length===1?'':'s'}`) },
   Y(){}, L1(){}, R1(){}, X(){}
 };
 
@@ -577,8 +609,8 @@ const act={
   L1(){press('L1');setTab(st.tab-1)}, R1(){press('R1');setTab(st.tab+1)},
   move(dx,dy){
     if(st.tab===1){ if(!GAMES.length) return; const d=st.variant===2?(dy||dx):(dx||0); if(!d)return; const n=Math.max(0,Math.min(GAMES.length-1,st.game+d)); if(n!==st.game){st.game=n;renderGames()} }
-    else if(st.tab===0){ if(dx){ st.stream=Math.max(0,Math.min(STREAMS.length,st.stream+dx)); renderStreams() } }
-    else if(st.tab===2){ const n=st.app+dx+dy*APP_COLS; if(n>=0&&n<APPS.length){st.app=n;renderApps()} }
+    else if(st.tab===0){ if(dx&&STREAMS.length){ st.stream=Math.max(0,Math.min(STREAMS.length-1,st.stream+dx)); renderStreams() } }
+    else if(st.tab===2){ const it=$$('.app'); if(!it.length) return; const n=spatial(it,st.app,dx,dy); if(n!==st.app){st.app=n;renderApps()} }
     else{ if(dy){ st.pref=Math.max(0,Math.min(PREFS.length-1,st.pref+dy)); focusPref() } else if(dx){ PREFS[st.pref].step(dx); if(st.mode==='home') renderPrefs() } }
   },
   A(){
@@ -589,8 +621,11 @@ const act={
   },
   B(){ if(st.tab!==1) setTab(1) },
   Y(){ if(st.tab===1) openDetails(); else if(st.tab===0) openPicker(); else if(st.tab===2&&APPS[st.app]) openMove(APPS[st.app]) },
-  X(){}
+  X(){ if(st.tab===2&&APPS[st.app]) toggleFav(APPS[st.app]) }
 };
+function toggleFav(a){ const i=favs.indexOf(a.pkg); if(i>=0) favs.splice(i,1); else favs.push(a.pkg);
+  save(); buildLists(); st.app=Math.max(0,APPS.findIndex(x=>x.pkg===a.pkg)); renderApps(); homeHints(); SFX.play('toggle');
+  toast(i>=0?`${a.name} removed from favourites`:`${a.name} added to favourites`) }
 const HANDLERS={home:act,details:DTa,ob:OBa,picker:PKa,move:MVa};
 function focusSig(){ return [st.mode,st.tab,st.game,st.app,st.stream,st.pref,DT.focus,DT.sheet,DT.sf,OB.step,OB.f,PK.f,MV.f].join('|') }
 function route(a,...x){ const h=HANDLERS[st.mode]||act, before=focusSig(), mode=st.mode;
@@ -630,6 +665,8 @@ $$('.tab').forEach(t=>t.onclick=()=>{if(st.mode==='home'){ if(+t.dataset.t!==st.
 $('#L1').onclick=()=>route('L1'); $('#R1').onclick=()=>route('R1');
 $$('[data-act="play"]').forEach(b=>b.onclick=()=>{if(st.mode==='home')act.A()});
 $$('[data-act="details"]').forEach(b=>b.onclick=()=>{if(st.mode==='home')openDetails()});
+$('#pkdone').onclick=()=>{ if(st.mode==='picker'){ PKa.B(); SFX.play('back') } };
+$('#sAdd').onclick=()=>{ if(st.mode==='home') openPicker() };
 $('#dback').onclick=()=>{ if(st.mode==='details'){ DTa.B(); SFX.play('back') } };
 $('#hints').addEventListener('click',e=>{const h=e.target.closest('.h');if(!h)return;const g=h.querySelector('.btnglyph');if(g)route(g.textContent)});
 let wheelLock=0; stage.addEventListener('wheel',e=>{if(!booted||st.mode!=='home'||st.tab>=2||Date.now()-wheelLock<140)return;wheelLock=Date.now();const d=Math.sign(e.deltaY||e.deltaX);(st.tab===1&&st.variant!==2)||st.tab===0?act.move(d,0):act.move(0,d)},{passive:true});
